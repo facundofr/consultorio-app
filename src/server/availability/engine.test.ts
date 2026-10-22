@@ -313,3 +313,20 @@ describe("computeAvailableSlots — other time zones", () => {
     expect(slots.map((s) => s.localTime)).toEqual(["09:00", "09:00"]);
   });
 });
+
+describe("computeOpenWindows", () => {
+  it("returns openings minus blocks, clipped to the range, per location", async () => {
+    const { computeOpenWindows } = await import("./engine");
+    const w = computeOpenWindows({
+      timezone: TZ,
+      from: ar(MON, "10:30"),
+      to: ar(TUE, "00:00"),
+      rules: [{ locationId: LOC_A, weekday: 1, startTime: "09:00", endTime: "12:00" }],
+      exceptions: [{ kind: "block", startsAt: ar(MON, "11:00"), endsAt: ar(MON, "11:15") }],
+    });
+    expect(w.map((x) => [x.start.toISOString(), x.end.toISOString(), x.locationId])).toEqual([
+      [ar(MON, "10:30").toISOString(), ar(MON, "11:00").toISOString(), LOC_A],
+      [ar(MON, "11:15").toISOString(), ar(MON, "12:00").toISOString(), LOC_A],
+    ]);
+  });
+});

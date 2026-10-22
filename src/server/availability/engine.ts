@@ -147,6 +147,32 @@ function buildOpenings(input: EngineInput): Opening[] {
   return openings;
 }
 
+export type OpenWindow = { start: Date; end: Date; locationId: string };
+
+/**
+ * Opening time per location after blocks (holidays, vacations, closures),
+ * ignoring appointments. Used by the agenda and occupancy stats.
+ */
+export function computeOpenWindows(input: Omit<EngineInput, "busy" | "durationMinutes" | "stepMinutes" | "minLeadMinutes" | "now">): OpenWindow[] {
+  const openings = buildOpenings({ ...input, busy: [], durationMinutes: 1, stepMinutes: 1, minLeadMinutes: 0, now: input.from });
+  const out: OpenWindow[] = [];
+  const locIds = [...new Set(openings.map((o) => o.locationId))];
+  const lo = input.from.getTime();
+  const hi = input.to.getTime();
+  for (const locationId of locIds) {
+    const blocks = input.exceptions
+      .filter((ex) => ex.kind === "block" && (!ex.locationId || ex.locationId === locationId))
+      .map((ex) => ({ start: ex.startsAt.getTime(), end: ex.endsAt.getTime() }));
+    const free = subtractIntervals(mergeIntervals(openings.filter((o) => o.locationId === locationId)), blocks);
+    for (const f of free) {
+      const start = Math.max(f.start, lo);
+      const end = Math.min(f.end, hi);
+      if (end > start) out.push({ start: new Date(start), end: new Date(end), locationId });
+    }
+  }
+  return out.sort((a, b) => a.start.getTime() - b.start.getTime());
+}
+
 export function computeAvailableSlots(input: EngineInput): Slot[] {
   const { timezone: tz } = input;
   if (input.durationMinutes <= 0) throw new Error("durationMinutes must be > 0");

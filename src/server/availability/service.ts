@@ -1,4 +1,4 @@
-import { and, eq, gt, inArray, isNull, lt, or } from "drizzle-orm";
+import { and, eq, gt, inArray, isNull, lt, ne, or } from "drizzle-orm";
 import { z } from "zod";
 import type { DbOrTx } from "@/db/client";
 import {
@@ -101,7 +101,7 @@ export async function getAvailableSlots(
   db: DbOrTx,
   query: AvailabilityQuery,
   now: Date = new Date(),
-  opts: { staff?: boolean } = {},
+  opts: { staff?: boolean; excludeAppointmentId?: string } = {},
 ): Promise<AvailabilityResult> {
   const q = AvailabilityQuery.parse(query);
   const bc = await loadBookingContext(db, q);
@@ -115,51 +115,15 @@ export async function getAvailableSlots(
   if (to <= from || bc.locationIds.length === 0) return { ...base, slots: [] };
 
   const allowedLocations = q.locationId ? [q.locationId] : bc.locationIds;
-  // Pad the window: overnight blocks and long services can reach across edges.
-  const padFrom = new Date(from.getTime() - DAY);
-  const padTo = new Date(to.getTime() + DAY);
-
-  const [rules, exceptions, busy] = await Promise.all([
-    db
-      .select()
-      .from(scheduleRules)
-      .where(
-        and(
-          eq(scheduleRules.professionalId, bc.professional.id),
-          eq(scheduleRules.active, true),
-          inArray(scheduleRules.locationId, allowedLocations),
-        ),
-      ),
-    db
-      .select()
-      .from(scheduleExceptions)
-      .where(
-        and(
-          eq(scheduleExceptions.clinicId, clinic.id),
-          lt(scheduleExceptions.startsAt, padTo),
-          gt(scheduleExceptions.endsAt, padFrom),
-          or(
-            eq(scheduleExceptions.scope, "clinic"),
-            and(eq(scheduleExceptions.scope, "location"), inArray(scheduleExceptions.locationId, bc.locationIds)),
-            and(
-              eq(scheduleExceptions.scope, "professional"),
-              eq(scheduleExceptions.professionalId, bc.professional.id),
-            ),
-          ),
-        ),
-      ),
-    db
-      .select({ startsAt: appointments.startsAt, endsAt: appointments.endsAt })
-      .from(appointments)
-      .where(
-        and(
-          eq(appointments.professionalId, bc.professional.id),
-          inArray(appointments.status, [...ACTIVE_APPOINTMENT_STATUSES]),
-          lt(appointments.startsAt, padTo),
-          gt(appointments.endsAt, padFrom),
-        ),
-      ),
-  ]);
+  const { rules, exceptions, busy } = await loadScheduleData(db, {
+    clinicId: clinic.id,
+    professionalId: bc.professional.id,
+    professionalLocationIds: bc.locationIds,
+    allowedLocationIds: allowedLocations,
+    from,
+    to,
+    excludeAppointmentId: opts.excludeAppointmentId,
+  });
 
   const slots = computeAvailableSlots({
     timezone: clinic.timezone,
@@ -170,6 +134,79 @@ export async function getAvailableSlots(
     stepMinutes: st.slotStepMinutes,
     minLeadMinutes: opts.staff ? 0 : st.minLeadMinutes,
     locationId: q.locationId ?? null,
+    rules,
+    exceptions,
+    busy,
+  });
+
+  return { ...base, slots };
+}
+
+/**
+ * Weekly rules, relevant exceptions and busy intervals for one professional
+ * around [from, to), already shaped for the engine. Shared by availability,
+ * the admin agenda and occupancy stats.
+ */
+export async function loadScheduleData(
+  db: DbOrTx,
+  p: {
+    clinicId: string;
+    professionalId: string;
+    professionalLocationIds: string[];
+    allowedLocationIds: string[];
+    from: Date;
+    to: Date;
+    excludeAppointmentId?: string;
+  },
+) {
+  // Pad the window: overnight blocks and long services can reach across edges.
+  const padFrom = new Date(p.from.getTime() - DAY);
+  const padTo = new Date(p.to.getTime() + DAY);
+  if (p.allowedLocationIds.length === 0) return { rules: [], exceptions: [], busy: [] };
+
+  const [rules, exceptions, busy] = await Promise.all([
+    db
+      .select()
+      .from(scheduleRules)
+      .where(
+        and(
+          eq(scheduleRules.professionalId, p.professionalId),
+          eq(scheduleRules.active, true),
+          inArray(scheduleRules.locationId, p.allowedLocationIds),
+        ),
+      ),
+    db
+      .select()
+      .from(scheduleExceptions)
+      .where(
+        and(
+          eq(scheduleExceptions.clinicId, p.clinicId),
+          lt(scheduleExceptions.startsAt, padTo),
+          gt(scheduleExceptions.endsAt, padFrom),
+          or(
+            eq(scheduleExceptions.scope, "clinic"),
+            p.professionalLocationIds.length
+              ? and(eq(scheduleExceptions.scope, "location"), inArray(scheduleExceptions.locationId, p.professionalLocationIds))
+              : undefined,
+            and(eq(scheduleExceptions.scope, "professional"), eq(scheduleExceptions.professionalId, p.professionalId)),
+          ),
+        ),
+      ),
+    db
+      .select({ startsAt: appointments.startsAt, endsAt: appointments.endsAt })
+      .from(appointments)
+      .where(
+        and(
+          eq(appointments.professionalId, p.professionalId),
+          inArray(appointments.status, [...ACTIVE_APPOINTMENT_STATUSES]),
+          p.excludeAppointmentId ? ne(appointments.id, p.excludeAppointmentId) : undefined,
+          lt(appointments.startsAt, padTo),
+          gt(appointments.endsAt, padFrom),
+        ),
+      ),
+  ]);
+
+  return {
     rules: rules.map((r) => ({
       locationId: r.locationId,
       weekday: r.weekday,
@@ -179,11 +216,9 @@ export async function getAvailableSlots(
       validTo: r.validTo,
     })),
     exceptions: exceptions
-      // Extra hours must be the professional's own and at an allowed location.
-      .filter((e) => e.kind === "block" || (e.locationId && allowedLocations.includes(e.locationId)))
+      // Extra hours must be at an allowed location.
+      .filter((e) => e.kind === "block" || (e.locationId && p.allowedLocationIds.includes(e.locationId)))
       .map((e) => ({ kind: e.kind, locationId: e.locationId, startsAt: e.startsAt, endsAt: e.endsAt })),
     busy,
-  });
-
-  return { ...base, slots };
+  };
 }

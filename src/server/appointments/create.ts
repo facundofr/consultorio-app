@@ -1,6 +1,7 @@
 import { z } from "zod";
 import type { Db } from "@/db/client";
-import { appointmentEvents, appointments, type AppointmentSource } from "@/db/schema";
+import { and, eq, isNull } from "drizzle-orm";
+import { appointmentEvents, appointments, patients, type AppointmentSource } from "@/db/schema";
 import { generateAppointmentCode, generateCancelToken, hashToken } from "@/lib/codes";
 import { getAvailableSlots, loadBookingContext } from "@/server/availability/service";
 import {
@@ -17,10 +18,13 @@ export const CreateAppointmentInput = z.object({
   locationId: z.string().uuid(),
   serviceId: z.string().uuid(),
   startsAt: z.coerce.date(),
-  patient: PatientInput,
+  /** New or returning patient (find-or-create by phone + name). */
+  patient: PatientInput.optional(),
+  /** Existing patient — admin bookings only. */
+  patientId: z.string().uuid().optional(),
   consent: z.boolean(),
   notes: z.string().max(1000).optional(),
-});
+}).refine((v) => !!v.patient !== !!v.patientId, { message: "Indicá los datos del paciente.", path: ["patient"] });
 export type CreateAppointmentInput = z.input<typeof CreateAppointmentInput>;
 
 export type CreateAppointmentOptions = {
@@ -55,6 +59,9 @@ export async function createAppointment(
   const now = opts.now ?? new Date();
   const isPatientFacing = opts.source !== "admin";
 
+  if (input.patientId && isPatientFacing) {
+    throw new DomainError("FORBIDDEN", "Operación no permitida.");
+  }
   if (isPatientFacing && !input.consent) {
     throw new DomainError("VALIDATION", "Necesitamos tu consentimiento para guardar tus datos y reservar el turno.");
   }
@@ -90,7 +97,17 @@ export async function createAppointment(
           }
         }
 
-        const patient = await upsertPatient(tx, bc.clinic.id, input.patient, input.consent ? now : null);
+        let patientId: string;
+        if (input.patientId) {
+          const [p] = await tx
+            .select({ id: patients.id })
+            .from(patients)
+            .where(and(eq(patients.id, input.patientId), eq(patients.clinicId, bc.clinic.id), isNull(patients.deletedAt)));
+          if (!p) throw new DomainError("NOT_FOUND", "No encontramos ese paciente.");
+          patientId = p.id;
+        } else {
+          patientId = (await upsertPatient(tx, bc.clinic.id, input.patient!, input.consent ? now : null)).id;
+        }
 
         const [row] = await tx
           .insert(appointments)
@@ -100,7 +117,7 @@ export async function createAppointment(
             professionalId: input.professionalId,
             specialtyId: bc.service.specialtyId,
             serviceId: input.serviceId,
-            patientId: patient.id,
+            patientId,
             code: generateAppointmentCode(),
             cancelTokenHash: hashToken(cancelToken),
             startsAt: input.startsAt,
