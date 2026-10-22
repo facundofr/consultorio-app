@@ -70,3 +70,16 @@ Registro de decisiones tomadas por default cuando el pedido era ambiguo. Cada un
 | U2 | Tipografía **Atkinson Hyperlegible Next**, servida desde la propia app (sin Google Fonts). Paleta eucalipto sobre blanco mineral; el amarillo «sol» marca solo lo importante del momento (horario elegido, hoy, la hora actual). | Diseñada para baja visión, pensando en pacientes mayores. Sin pedidos a terceros. |
 | U3 | Solo tema claro por ahora. | Menos superficie para revisar contraste. Se puede sumar. |
 | U4 | Selects nativos en formularios, búsquedas por GET y pestañas por URL. | Funcionan sin JavaScript, son accesibles y el estado queda en la URL. |
+
+## Reserva y cancelación del paciente (hito 3)
+
+| # | Decisión | Por qué |
+|---|----------|---------|
+| R1 | El formulario es un **asistente paso a paso con el estado en la URL** (`/reservar?clinica=…&especialidad=…`), renderizado en el servidor. Cada paso se valida en el servidor; un parámetro inválido vuelve a ese paso. | Funciona sin JavaScript (accesibilidad), el «atrás» del navegador anda y se puede compartir el enlace. |
+| R2 | Formulario y asistente usan la **misma capa** `src/server/booking/public.ts` (catálogo, `findSlots`, `bookPublic`, `findAppointmentPublic`, `cancelPublic`). | Un único lugar para las reglas. |
+| R3 | «El primero disponible» combina los horarios de todos los profesionales de la especialidad. En cada horario se ofrece un solo profesional (el primero por orden alfabético). | Evitar horarios repetidos. |
+| R4 | La confirmación pide una casilla de consentimiento obligatoria (texto y versión guardados en el paciente). Hay un campo trampa invisible contra bots y un límite de 10 reservas por IP por hora. | Ley 25.326 y spam. |
+| R5 | Segundo dato para ver un turno: **token del enlace** (256 bits, solo se guarda su hash) **o teléfono o email** del paciente. El error es siempre el mismo («no encontramos un turno con esos datos»), para no confirmar que un código existe. Límites: 15 consultas por IP cada 15 minutos y 8 por código por hora. | Evitar que se adivinen turnos ajenos. |
+| R6 | La regla de cancelación es `ahora ≤ inicio − horas configuradas`. Justo en el límite se puede cancelar; un segundo después, no. Se evalúa con un `SELECT … FOR UPDATE` dentro de la transacción. | Lo pide el §6 y evita que dos cancelaciones simultáneas pasen las dos. |
+| R7 | Las páginas `/turno/*` envían `Referrer-Policy: no-referrer`, `noindex` y `no-store`. | El enlace lleva el token: no se puede filtrar por el Referer ni quedar en caché. |
+| R8 | El `.ics` usa horas UTC, una alarma 2 h antes, y `METHOD:CANCEL` si el turno se canceló. | Compatible con Google Calendar, Apple y Outlook. |

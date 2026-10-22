@@ -2,7 +2,7 @@
 
 Reserva de turnos médicos online: el paciente conversa con un asistente de IA (o usa un formulario) y el equipo de la clínica gestiona todo desde `/admin`.
 
-> Estado: **hito 2 de 6**. Están listos el esquema, el seed, el motor de disponibilidad y el panel de administración completo. Ver [`DECISIONS.md`](./DECISIONS.md).
+> Estado: **hito 3 de 6**. Están listos el esquema, el seed, el motor de disponibilidad, el panel de administración, la reserva por formulario y la cancelación. Ver [`DECISIONS.md`](./DECISIONS.md).
 
 ## Requisitos
 
@@ -39,6 +39,15 @@ En Windows sin openssl: `node -e "console.log(require('crypto').randomBytes(32).
 | Superadmin | `superadmin@turnos.example` | Todo, en todas las clínicas |
 | Administración | `admin@aurora.example`, `admin@aromos.example` | Todo dentro de su clínica |
 | Recepción | `recepcion@aurora.example`, `recepcion@aromos.example` | Agenda, turnos y pacientes |
+
+## Para el paciente
+
+- **`/reservar`**: reserva paso a paso: clínica → sede → especialidad → profesional (o «el primero disponible») → tipo de consulta → día (solo se marcan días con horarios libres reales) → horario → datos y consentimiento → confirmación. Los pasos con una sola opción se saltean solos. El estado vive en la URL: funciona sin JavaScript y el botón «atrás» del navegador sirve.
+- **`/turno/[código]?t=…`**: el enlace del email. Muestra el turno, «Agregar al calendario (.ics)» y el botón para cancelar si faltan más de las horas configuradas (24 por defecto). Pasado ese plazo muestra el teléfono de la clínica. Después de cancelar ofrece elegir otro horario con el mismo profesional.
+- **`/turno`**: ver o cancelar con el **código + teléfono o email** usados al reservar.
+- **`/privacidad`**: política de datos personales (Ley 25.326).
+
+La regla de cancelación se evalúa **en el servidor, dentro de la transacción y con la hora del servidor**. Tests de borde: 24 h 00 m 00 s (se puede), 23 h 59 m 59 s (no), ya pasado, ya cancelado y cancelación doble simultánea (solo una gana).
 
 ## Panel de administración (`/admin`)
 
