@@ -31,3 +31,5 @@ pnpm-debug.log*
 # local backups
 /backups
 *.tmp.mjs
+/.pg-e2e
+/tests/e2e/.auth

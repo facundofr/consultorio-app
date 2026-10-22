@@ -35,7 +35,7 @@ export default async function ExceptionsPage({ searchParams }: PageProps<"/admin
         <section className="flex flex-col gap-4">
           <form method="get" className="flex flex-wrap items-end gap-3">
             <div className="flex flex-col gap-1.5">
-              <Label htmlFor="alcance">Alcance</Label>
+              <Label htmlFor="alcance">Mostrar</Label>
               <NativeSelect id="alcance" name="alcance" defaultValue={scope ?? ""} className="w-52">
                 <option value="">Todos</option>
                 <option value="clinic">Feriados de la clínica</option>

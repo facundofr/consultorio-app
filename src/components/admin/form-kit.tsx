@@ -123,7 +123,7 @@ export function TextField({
   const error = state.fieldErrors?.[name];
   const value = useFieldValue(name, defaultValue === null || defaultValue === undefined ? undefined : String(defaultValue));
   return (
-    <FieldShell id={id} label={<>{label}{required ? <span className="text-destructive"> *</span> : null}</>} hint={hint} error={error} className={className}>
+    <FieldShell id={id} label={<>{label}{required ? <span className="text-destructive" aria-hidden> *</span> : null}</>} hint={hint} error={error} className={className}>
       <Input
         id={id}
         name={name}
@@ -151,7 +151,7 @@ export function TextAreaField({
   const error = state.fieldErrors?.[name];
   const value = useFieldValue(name, defaultValue ?? undefined);
   return (
-    <FieldShell id={id} label={<>{label}{required ? <span className="text-destructive"> *</span> : null}</>} hint={hint} error={error} className={className}>
+    <FieldShell id={id} label={<>{label}{required ? <span className="text-destructive" aria-hidden> *</span> : null}</>} hint={hint} error={error} className={className}>
       <Textarea id={id} name={name} defaultValue={value as string | undefined} aria-invalid={!!error || undefined} aria-describedby={error ? `${id}-error` : undefined} {...rest} />
     </FieldShell>
   );
@@ -178,7 +178,7 @@ export function SelectField({
   const error = state.fieldErrors?.[name];
   const value = useFieldValue(name, defaultValue ?? "");
   return (
-    <FieldShell id={id} label={<>{label}{required ? <span className="text-destructive"> *</span> : null}</>} hint={hint} error={error} className={className}>
+    <FieldShell id={id} label={<>{label}{required ? <span className="text-destructive" aria-hidden> *</span> : null}</>} hint={hint} error={error} className={className}>
       <NativeSelect id={id} name={name} defaultValue={value as string} aria-invalid={!!error || undefined} aria-describedby={error ? `${id}-error` : undefined} {...rest}>
         {placeholder !== undefined ? <option value="">{placeholder}</option> : null}
         {options.map((o) => (
