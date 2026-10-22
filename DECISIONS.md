@@ -43,3 +43,30 @@ Registro de decisiones tomadas por default cuando el pedido era ambiguo. Cada un
 |---|----------|
 | S1 | Clínicas, personas, direcciones y teléfonos del seed son **inventados** (`.example`, "Av. Inventada"). |
 | S2 | Feriados nacionales 2026 completos y los **inamovibles** de 2027 (los trasladables de 2027 aún no tienen decreto). Se editan desde el admin. Los "días no laborables con fines turísticos" no se cargan porque las clínicas suelen atender. |
+
+## Panel de administración (hito 2)
+
+| # | Decisión | Por qué |
+|---|----------|---------|
+| P1 | **Permisos**: `superadmin` todo; `clinic_admin` todo dentro de su clínica (no crea clínicas ni superadmins); `staff` (recepción) agenda, turnos y pacientes, y ve el catálogo en solo lectura. Matriz en `src/server/auth/rbac.ts`. | Recepción no debería cambiar horarios ni reglas. |
+| P2 | Cada función de `src/server/admin/*` valida rol **y** clínica. Las server actions solo traducen formularios. Lo que no se puede ver devuelve 404 (no 403), para no confirmar que existe. | El control no depende de la UI y está testeado a nivel servicio. |
+| P3 | El superadmin elige la clínica activa con un selector (cookie `httpOnly`). El resto trabaja siempre en la suya. | Un panel por clínica, sin mezclar datos. |
+| P4 | Sesiones en base de datos, 12 h. Cambiar contraseña, rol, clínica o desactivar a un usuario **cierra sus sesiones**. Nadie puede bajarse el rol ni desactivarse a sí mismo. | Que un cambio de permisos tenga efecto inmediato. |
+| P5 | Login limitado a 5 intentos por email y 20 por IP cada 15 minutos. Sin registro público: los usuarios los crea un admin. | Fuerza bruta. |
+| P6 | **Sobreturnos**: administración (no recepción) puede agendar o mover fuera de la grilla publicada. Igual nunca se superpone (lo impide la base). | Caso real de consultorio, sin romper el anti doble turno. |
+| P7 | Mover un turno: diálogo con día y horarios libres reales (no arrastrar). Reinicia el recordatorio. | Más accesible por teclado y lector de pantalla. Arrastrar queda como mejora. |
+| P8 | Pacientes cargados por el equipo: email **opcional** y sin consentimiento online (se registra «Cargado por el equipo»). Si ya existe con ese teléfono y nombre, se reutiliza. | En recepción no siempre hay email. |
+| P9 | Bajas lógicas para sedes, especialidades, servicios, FAQ, profesionales, pacientes y clínicas. No se puede dar de baja algo con turnos futuros confirmados. Los **feriados y bloqueos se borran de verdad** (son configuración) y queda registro en auditoría. | Conservar historial sin dejar turnos huérfanos. |
+| P10 | Cargar un bloqueo **no cancela** turnos automáticamente: avisa cuántos quedan afectados para que el equipo decida. | Cancelar es una decisión humana (hay que avisar al paciente). |
+| P11 | El CSV incluye teléfono y email descifrados, separados por `;` y con BOM UTF-8 para Excel es-AR. Se protege contra inyección de fórmulas y **cada exportación queda en auditoría**. | Uso habitual de recepción, con trazabilidad. |
+| P12 | La auditoría guarda ids y **nombres de campos** cambiados, nunca valores de datos personales. | Ley 25.326: el log no puede ser otra copia de los datos. |
+| P13 | Un turno puede marcarse atendido o ausente, y volver a confirmado. Un turno cancelado no se reactiva: se crea uno nuevo. | Historial claro. |
+
+## Interfaz
+
+| # | Decisión | Por qué |
+|---|----------|---------|
+| U1 | Componentes estilo **shadcn/ui escritos a mano** (Radix + CVA + Tailwind) en `src/components/ui`, con `components.json` para usar `shadcn add` después. | El registro de shadcn no era accesible desde el entorno de desarrollo. El resultado es el mismo código. |
+| U2 | Tipografía **Atkinson Hyperlegible Next**, servida desde la propia app (sin Google Fonts). Paleta eucalipto sobre blanco mineral; el amarillo «sol» marca solo lo importante del momento (horario elegido, hoy, la hora actual). | Diseñada para baja visión, pensando en pacientes mayores. Sin pedidos a terceros. |
+| U3 | Solo tema claro por ahora. | Menos superficie para revisar contraste. Se puede sumar. |
+| U4 | Selects nativos en formularios, búsquedas por GET y pestañas por URL. | Funcionan sin JavaScript, son accesibles y el estado queda en la URL. |
