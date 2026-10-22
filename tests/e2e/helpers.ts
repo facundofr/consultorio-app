@@ -21,3 +21,9 @@ export function nextWorkday(minDaysAhead = 2, weekday?: number): string {
   }
   throw new Error("no workday found");
 }
+
+export type Fixtures = { soon: { code: string; token: string; phone: string } };
+export function fixtures(): Fixtures {
+  // eslint-disable-next-line @typescript-eslint/no-require-imports
+  return JSON.parse(require("node:fs").readFileSync("tests/e2e/.auth/fixtures.json", "utf8"));
+}

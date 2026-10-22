@@ -15,6 +15,39 @@ import { runMigrations } from "../src/db/migrate";
 import { seedDemo } from "../src/db/seed";
 import { seedAdminUsers } from "../src/db/seed-users";
 import { startEmbeddedPostgres } from "./embedded-pg";
+import { and, eq } from "drizzle-orm";
+import type { Db } from "../src/db/client";
+import { professionalLocations, professionals, professionalSpecialties, services } from "../src/db/schema";
+import { createAppointment } from "../src/server/appointments/create";
+
+/**
+ * An appointment that starts in ~3 hours (inside the 24 h window), so the
+ * "cannot cancel online" path can be tested end to end.
+ */
+async function writeFixtures(db: Db) {
+  const [prof] = await db.select().from(professionals).where(and(eq(professionals.firstName, "Lucía"), eq(professionals.lastName, "Ferrante")));
+  const [loc] = await db.select().from(professionalLocations).where(eq(professionalLocations.professionalId, prof.id));
+  const [spec] = await db.select().from(professionalSpecialties).where(eq(professionalSpecialties.professionalId, prof.id));
+  const [svc] = await db.select().from(services).where(eq(services.specialtyId, spec.specialtyId));
+  const startsAt = new Date(Math.ceil((Date.now() + 3 * 3_600_000) / 900_000) * 900_000);
+  const soon = await createAppointment(
+    db,
+    {
+      professionalId: prof.id,
+      locationId: loc.locationId,
+      serviceId: svc.id,
+      startsAt,
+      patient: { fullName: "Paciente Ventana Cerrada", phone: "11 7000-0001", email: "ventana@example.com" },
+      consent: true,
+    },
+    { source: "admin", allowOutsideGrid: true },
+  );
+  fs.mkdirSync("tests/e2e/.auth", { recursive: true });
+  fs.writeFileSync(
+    "tests/e2e/.auth/fixtures.json",
+    JSON.stringify({ soon: { code: soon.appointment.code, token: soon.cancelToken, phone: "11 7000-0001" } }, null, 2),
+  );
+}
 
 export const E2E_PASSWORD = "e2e-password-123";
 
@@ -55,6 +88,7 @@ async function main() {
     const holder = createDb(url, 2);
     await seedDemo(holder.db);
     await seedAdminUsers(holder.db, E2E_PASSWORD);
+    await writeFixtures(holder.db);
     await holder.sql.end();
 
     const res = spawnSync("pnpm", ["exec", "playwright", "test", ...pwArgs], { stdio: "inherit", env });
