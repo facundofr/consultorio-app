@@ -13,6 +13,8 @@ const EnvSchema = z.object({
   // 32-byte keys, base64. Generate with: openssl rand -base64 32
   PII_ENCRYPTION_KEY: z.string().min(40),
   PII_HASH_KEY: z.string().min(40),
+
+  BETTER_AUTH_SECRET: z.string().min(32),
 });
 
 export type Env = z.infer<typeof EnvSchema>;
