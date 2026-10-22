@@ -206,9 +206,11 @@ describe("anti double-booking", () => {
 
   it("the database itself rejects overlaps even bypassing the service layer", async () => {
     const { appointment } = await book(ar(MON, "12:00"));
+    // eslint-disable-next-line @typescript-eslint/no-unused-vars
+    const { id, during, ...copy } = appointment;
     const err = await db
       .insert(appointments)
-      .values({ ...appointment, id: undefined as never, during: undefined as never, code: "T-ZZZZZZ", startsAt: ar(MON, "12:15"), endsAt: ar(MON, "12:45") })
+      .values({ ...copy, code: "T-ZZZZZZ", startsAt: ar(MON, "12:15"), endsAt: ar(MON, "12:45") })
       .catch((e: unknown) => e);
     expect(pgErrorCode(err)).toBe("23P01");
   });
