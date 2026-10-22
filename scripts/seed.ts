@@ -10,6 +10,7 @@ import { createDb } from "../src/db/client";
 import { runMigrations } from "../src/db/migrate";
 import { clinics } from "../src/db/schema";
 import { seedDemo } from "../src/db/seed";
+import { seedAdminUsers } from "../src/db/seed-users";
 
 async function main() {
   const url = process.env.DATABASE_URL;
@@ -38,7 +39,10 @@ async function main() {
       }
     }
     const result = await seedDemo(db);
-    console.log("Seed listo:", result);
+    const users = await seedAdminUsers(db);
+    console.log("Seed listo:", { ...result, users: users.length });
+    console.log("\nUsuarios del panel (/admin):");
+    for (const u of users) console.log(`  ${u.role.padEnd(13)} ${u.email.padEnd(32)} ${u.password}`);
   } finally {
     await client.end({ timeout: 5 });
   }
