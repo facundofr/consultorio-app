@@ -1,24 +1,103 @@
 @import "tailwindcss";
+@import "tw-animate-css";
+@import "@fontsource-variable/atkinson-hyperlegible-next";
 
+/*
+ * Turnos IA design tokens.
+ * Eucalyptus green on a cool mineral white; Atkinson Hyperlegible Next for
+ * everything (designed for low-vision readers). "Sol" marks the one thing
+ * that matters right now: the chosen slot, today in the agenda.
+ */
 :root {
-  --background: #ffffff;
-  --foreground: #171717;
+  color-scheme: light;
+  --tinta: #17262e;
+  --papel: #f5f7f6;
+  --eucalipto: #0f5c53;
+  --eucalipto-oscuro: #0a443d;
+  --eucalipto-claro: #e3efec;
+  --sol: #f0b429;
+  --sol-claro: #fdf3d8;
+  --linea: #d5dedb;
+  --gris: #56656c;
+  --alerta: #a8321f;
+  --alerta-claro: #fbe9e5;
+
+  --background: var(--papel);
+  --foreground: var(--tinta);
+  --card: #ffffff;
+  --card-foreground: var(--tinta);
+  --popover: #ffffff;
+  --popover-foreground: var(--tinta);
+  --primary: var(--eucalipto);
+  --primary-foreground: #ffffff;
+  --secondary: var(--eucalipto-claro);
+  --secondary-foreground: var(--eucalipto-oscuro);
+  --muted: #eaefed;
+  --muted-foreground: var(--gris);
+  --accent: var(--eucalipto-claro);
+  --accent-foreground: var(--eucalipto-oscuro);
+  --destructive: var(--alerta);
+  --border: var(--linea);
+  --input: #b9c6c2;
+  --ring: var(--tinta);
+  --radius: 0.625rem;
 }
 
 @theme inline {
+  --font-sans: "Atkinson Hyperlegible Next Variable", system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
   --color-background: var(--background);
   --color-foreground: var(--foreground);
+  --color-card: var(--card);
+  --color-card-foreground: var(--card-foreground);
+  --color-popover: var(--popover);
+  --color-popover-foreground: var(--popover-foreground);
+  --color-primary: var(--primary);
+  --color-primary-foreground: var(--primary-foreground);
+  --color-secondary: var(--secondary);
+  --color-secondary-foreground: var(--secondary-foreground);
+  --color-muted: var(--muted);
+  --color-muted-foreground: var(--muted-foreground);
+  --color-accent: var(--accent);
+  --color-accent-foreground: var(--accent-foreground);
+  --color-destructive: var(--destructive);
+  --color-border: var(--border);
+  --color-input: var(--input);
+  --color-ring: var(--ring);
+  --color-tinta: var(--tinta);
+  --color-sol: var(--sol);
+  --color-sol-claro: var(--sol-claro);
+  --color-alerta-claro: var(--alerta-claro);
+  --color-eucalipto-oscuro: var(--eucalipto-oscuro);
+  --radius-sm: calc(var(--radius) - 4px);
+  --radius-md: calc(var(--radius) - 2px);
+  --radius-lg: var(--radius);
+  --radius-xl: calc(var(--radius) + 4px);
 }
 
-@media (prefers-color-scheme: dark) {
-  :root {
-    --background: #0a0a0a;
-    --foreground: #ededed;
+@layer base {
+  * {
+    @apply border-border;
   }
-}
-
-body {
-  background: var(--background);
-  color: var(--foreground);
-  font-family: system-ui, -apple-system, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
+  html {
+    -webkit-text-size-adjust: 100%;
+  }
+  body {
+    @apply bg-background text-foreground font-sans;
+    font-size: 1rem;
+    line-height: 1.5;
+  }
+  h1, h2, h3 {
+    line-height: 1.2;
+    text-wrap: balance;
+  }
+  :focus-visible {
+    outline: 3px solid var(--ring);
+    outline-offset: 2px;
+  }
+  @media (prefers-reduced-motion: reduce) {
+    *, *::before, *::after {
+      animation-duration: 0.01ms !important;
+      transition-duration: 0.01ms !important;
+    }
+  }
 }
