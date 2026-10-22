@@ -4,7 +4,11 @@ import { fileURLToPath } from "node:url";
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 import { defineConfig } from "vitest/config";
 
-const alias = { "@": path.resolve(__dirname, "src") };
+const alias = {
+  "@": path.resolve(__dirname, "src"),
+  // `server-only` throws outside React Server Components; tests run in plain Node.
+  "server-only": path.resolve(__dirname, "tests/setup/empty.ts"),
+};
 
 export default defineConfig({
   resolve: { alias },
