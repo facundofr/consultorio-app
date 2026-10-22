@@ -1,3 +1,9 @@
+onlyBuiltDependencies:
+  - esbuild
+  - '@embedded-postgres/linux-x64'
+  - '@embedded-postgres/darwin-arm64'
+  - '@embedded-postgres/darwin-x64'
+  - '@embedded-postgres/windows-x64'
 ignoredBuiltDependencies:
   - sharp
   - unrs-resolver
