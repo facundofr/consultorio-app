@@ -265,6 +265,9 @@ export type PublicAppointmentView = {
   location: { name: string; address: string; city: string | null; notes: string | null };
   patientFirstName: string;
   cancel: { allowed: boolean; reason?: "ALREADY_CANCELLED" | "NOT_CANCELLABLE" | "CANCEL_WINDOW_PASSED"; deadline: Date; minHours: number };
+  outOfWindowMessage: string;
+  /** Wizard URL with the same clinic, specialty, professional and service ("reprogramar"). */
+  rebookHref: string;
 };
 
 const NOT_FOUND_MSG = "No encontramos un turno con esos datos. Revisá el código y el teléfono o email.";
@@ -292,12 +295,14 @@ export async function findAppointmentPublic(db: Db, codeInput: string, factor: S
       locCity: locations.city,
       locNotes: locations.notes,
       clinicName: clinics.name,
+      clinicSlug: clinics.slug,
       clinicPhone: clinics.phone,
       clinicEmail: clinics.email,
       tz: clinics.timezone,
       cancelMinHours: settings.cancelMinHours,
       contactPhone: settings.contactPhone,
       contactEmail: settings.contactEmail,
+      outOfWindowMessage: settings.outOfWindowMessage,
     })
     .from(appointments)
     .innerJoin(patients, eq(patients.id, appointments.patientId))
@@ -333,6 +338,10 @@ export async function findAppointmentPublic(db: Db, codeInput: string, factor: S
     location: { name: row.locName, address: row.locAddress, city: row.locCity, notes: row.locNotes },
     patientFirstName: row.fullName.split(" ")[0] ?? row.fullName,
     cancel: check.ok ? { allowed: true, deadline: check.deadline, minHours } : { allowed: false, reason: check.reason, deadline: check.deadline, minHours },
+    outOfWindowMessage: row.outOfWindowMessage ?? "Ya no se puede cancelar online. Comunicate con la clínica.",
+    rebookHref:
+      `/reservar?clinica=${encodeURIComponent(row.clinicSlug)}&sede=${row.a.locationId}` +
+      (row.a.specialtyId ? `&especialidad=${row.a.specialtyId}&profesional=${row.a.professionalId}&consulta=${row.a.serviceId}` : ""),
   };
 }
 
