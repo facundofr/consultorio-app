@@ -6,6 +6,19 @@ const nextConfig: NextConfig = {
   output: "standalone",
   poweredByHeader: false,
   serverExternalPackages: ["@node-rs/argon2"],
+  async headers() {
+    return [
+      {
+        // Links with a cancel token must never leak through the Referer header.
+        source: "/turno/:path*",
+        headers: [
+          { key: "Referrer-Policy", value: "no-referrer" },
+          { key: "X-Robots-Tag", value: "noindex" },
+          { key: "Cache-Control", value: "no-store" },
+        ],
+      },
+    ];
+  },
   turbopack: {
     rules: {
       "*.css": {
