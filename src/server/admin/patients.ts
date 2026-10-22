@@ -163,3 +163,22 @@ export async function deletePatient(db: Db, actor: Actor, id: string) {
   await db.update(patients).set({ deletedAt: new Date() }).where(eq(patients.id, id));
   await audit(db, actor, { action: "delete", entity: "patient", entityId: id, clinicId: p.clinicId });
 }
+
+/** Staff-entered patient: reuse it when phone + name already exist, else create (email optional). */
+export async function findOrCreatePatientAdmin(db: Db, actor: Actor, clinicId: string, raw: AdminPatientInput): Promise<string> {
+  assertCan(actor, "write", "patients", clinicId);
+  const input = AdminPatientInput.parse(raw);
+  const phoneHash = blindIndex("phone", normalizePhone(input.phone));
+  const [hit] = await db
+    .select({ id: patients.id, emailEnc: patients.emailEnc })
+    .from(patients)
+    .where(and(eq(patients.clinicId, clinicId), eq(patients.phoneHash, phoneHash), eq(patients.nameKey, normalizeName(input.fullName))));
+  if (hit) {
+    if (input.email) {
+      const email = normalizeEmail(input.email);
+      await db.update(patients).set({ emailEnc: encrypt(email), emailHash: blindIndex("email", email), deletedAt: null }).where(eq(patients.id, hit.id));
+    }
+    return hit.id;
+  }
+  return savePatient(db, actor, clinicId, input);
+}
