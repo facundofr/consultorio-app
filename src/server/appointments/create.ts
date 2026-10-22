@@ -1,0 +1,138 @@
+import { z } from "zod";
+import type { Db } from "@/db/client";
+import { appointmentEvents, appointments, type AppointmentSource } from "@/db/schema";
+import { generateAppointmentCode, generateCancelToken, hashToken } from "@/lib/codes";
+import { getAvailableSlots, loadBookingContext } from "@/server/availability/service";
+import {
+  DomainError,
+  PG_EXCLUSION_VIOLATION,
+  PG_UNIQUE_VIOLATION,
+  pgConstraint,
+  pgErrorCode,
+} from "@/server/errors";
+import { PatientInput, upsertPatient } from "@/server/patients/service";
+
+export const CreateAppointmentInput = z.object({
+  professionalId: z.string().uuid(),
+  locationId: z.string().uuid(),
+  serviceId: z.string().uuid(),
+  startsAt: z.coerce.date(),
+  patient: PatientInput,
+  consent: z.boolean(),
+  notes: z.string().max(1000).optional(),
+});
+export type CreateAppointmentInput = z.input<typeof CreateAppointmentInput>;
+
+export type CreateAppointmentOptions = {
+  source: AppointmentSource;
+  now?: Date;
+  /** Admin/staff bookings may skip the patient-facing availability rules (lead time, horizon). */
+  actorUserId?: string | null;
+  conversationId?: string | null;
+  /** Admin only: allow booking outside the published grid (still never overlapping). */
+  allowOutsideGrid?: boolean;
+};
+
+export type CreatedAppointment = {
+  appointment: typeof appointments.$inferSelect;
+  /** Plain cancel token — only available right now, never stored. */
+  cancelToken: string;
+};
+
+/**
+ * The single entry point to book an appointment (form, assistant and admin).
+ *
+ * Re-validates everything on the server inside one transaction:
+ * the slot must be returned by the availability engine right now, and the
+ * database exclusion constraint guarantees no double booking under concurrency.
+ */
+export async function createAppointment(
+  db: Db,
+  rawInput: CreateAppointmentInput,
+  opts: CreateAppointmentOptions,
+): Promise<CreatedAppointment> {
+  const input = CreateAppointmentInput.parse(rawInput);
+  const now = opts.now ?? new Date();
+  const isPatientFacing = opts.source !== "admin";
+
+  if (isPatientFacing && !input.consent) {
+    throw new DomainError("VALIDATION", "Necesitamos tu consentimiento para guardar tus datos y reservar el turno.");
+  }
+
+  for (let attempt = 0; attempt < 3; attempt++) {
+    const cancelToken = generateCancelToken();
+    try {
+      const appointment = await db.transaction(async (tx) => {
+        const bc = await loadBookingContext(tx, input);
+        const endsAt = new Date(input.startsAt.getTime() + bc.service.durationMinutes * 60_000);
+
+        if (!opts.allowOutsideGrid) {
+          const { slots } = await getAvailableSlots(
+            tx,
+            {
+              professionalId: input.professionalId,
+              serviceId: input.serviceId,
+              locationId: input.locationId,
+              from: input.startsAt,
+              to: new Date(input.startsAt.getTime() + 60_000),
+            },
+            now,
+            { staff: !isPatientFacing },
+          );
+          const ok = slots.some(
+            (s) => s.startsAt.getTime() === input.startsAt.getTime() && s.locationId === input.locationId,
+          );
+          if (!ok) {
+            throw new DomainError(
+              "SLOT_UNAVAILABLE",
+              "Ese horario ya no está disponible. Elegí otro, por favor.",
+            );
+          }
+        }
+
+        const patient = await upsertPatient(tx, bc.clinic.id, input.patient, input.consent ? now : null);
+
+        const [row] = await tx
+          .insert(appointments)
+          .values({
+            clinicId: bc.clinic.id,
+            locationId: input.locationId,
+            professionalId: input.professionalId,
+            specialtyId: bc.service.specialtyId,
+            serviceId: input.serviceId,
+            patientId: patient.id,
+            code: generateAppointmentCode(),
+            cancelTokenHash: hashToken(cancelToken),
+            startsAt: input.startsAt,
+            endsAt,
+            status: "confirmed",
+            source: opts.source,
+            notes: input.notes,
+            createdByUserId: opts.actorUserId ?? null,
+            conversationId: opts.conversationId ?? null,
+          })
+          .returning();
+
+        await tx.insert(appointmentEvents).values({
+          appointmentId: row.id,
+          type: "created",
+          actor: opts.source === "admin" ? "admin" : opts.source === "ai" ? "ai" : "patient",
+          actorUserId: opts.actorUserId ?? null,
+          data: { source: opts.source, startsAt: row.startsAt.toISOString() },
+        });
+        return row;
+      });
+      return { appointment, cancelToken };
+    } catch (err) {
+      const code = pgErrorCode(err);
+      if (code === PG_EXCLUSION_VIOLATION) {
+        throw new DomainError("SLOT_TAKEN", "Uy, alguien acaba de tomar ese horario. Elegí otro, por favor.");
+      }
+      if (code === PG_UNIQUE_VIOLATION && pgConstraint(err)?.includes("code")) {
+        continue; // appointment code collision: retry with a new code
+      }
+      throw err;
+    }
+  }
+  throw new Error("Could not generate a unique appointment code");
+}
