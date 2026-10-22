@@ -30,6 +30,7 @@ export type AgendaAppointment = {
   source: string;
   patientName: string;
   serviceName: string;
+  serviceId: string;
   professionalId: string;
   professionalName: string;
   locationId: string;
@@ -150,6 +151,7 @@ export async function getAgenda(
             source: appointments.source,
             patientName: patients.fullName,
             serviceName: services.name,
+            serviceId: services.id,
             professionalId: professionals.id,
             pTitle: professionals.title,
             pFirst: professionals.firstName,
@@ -174,6 +176,7 @@ export async function getAgenda(
     source: r.source,
     patientName: r.patientName,
     serviceName: r.serviceName,
+    serviceId: r.serviceId,
     professionalId: r.professionalId,
     professionalName: professionalDisplayName({ title: r.pTitle, firstName: r.pFirst, lastName: r.pLast }),
     locationId: r.locationId,
