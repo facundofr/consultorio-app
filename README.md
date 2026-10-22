@@ -1,36 +1,61 @@
-This is a [Next.js](https://nextjs.org) project bootstrapped with [`create-next-app`](https://nextjs.org/docs/app/api-reference/cli/create-next-app).
+# Turnos IA
 
-## Getting Started
+Reserva de turnos médicos online: el paciente conversa con un asistente de IA (o usa un formulario) y el equipo de la clínica gestiona todo desde `/admin`.
 
-First, run the development server:
+> Estado: **hito 1 de 6** — esquema de datos, seed y motor de disponibilidad. Ver [`DECISIONS.md`](./DECISIONS.md).
+
+## Requisitos
+
+- Node.js 22+ y pnpm 10 (`corepack enable`)
+- PostgreSQL 17 (con Docker o sin Docker, ver abajo)
+
+## Puesta en marcha (desarrollo)
 
 ```bash
-npm run dev
-# or
-yarn dev
-# or
-pnpm dev
-# or
-bun dev
+pnpm install
+cp .env.example .env              # completá las claves (ver abajo)
+
+# Opción A — con Docker
+docker compose -f docker-compose.dev.yml up -d     # Postgres :5432 + Mailpit :8025
+
+# Opción B — sin Docker (Postgres 17 real desde npm, puerto 5433)
+pnpm db:embedded                  # dejarlo corriendo en otra terminal
+# y en .env: DATABASE_URL=postgres://postgres:postgres@127.0.0.1:5433/turnos
+
+pnpm db:migrate
+pnpm seed                         # datos de demo (inventados)
+pnpm dev                          # http://localhost:3000
 ```
 
-Open [http://localhost:3000](http://localhost:3000) with your browser to see the result.
+Generá las claves de datos personales con `openssl rand -base64 32` (una para `PII_ENCRYPTION_KEY` y otra para `PII_HASH_KEY`).
+En Windows sin openssl: `node -e "console.log(require('crypto').randomBytes(32).toString('base64'))"`.
 
-You can start editing the page by modifying `app/page.tsx`. The page auto-updates as you edit the file.
+## Scripts
 
-This project uses [`next/font`](https://nextjs.org/docs/app/building-your-application/optimizing/fonts) to automatically optimize and load [Geist](https://vercel.com/font), a new font family for Vercel.
+| Comando | Qué hace |
+|---|---|
+| `pnpm dev` / `pnpm build` / `pnpm start` | Next.js |
+| `pnpm test` | Todos los tests (unitarios + integración con Postgres real) |
+| `pnpm test:unit` / `pnpm test:integration` | Por separado |
+| `pnpm typecheck` / `pnpm lint` | Tipos y lint |
+| `pnpm db:generate` | Genera una migración a partir de `src/db/schema.ts` |
+| `pnpm db:migrate` | Aplica migraciones |
+| `pnpm seed` / `pnpm seed --reset` | Carga datos de demo (con `--reset` vacía la base antes) |
+| `pnpm db:embedded` | Postgres 17 local sin Docker |
 
-## Learn More
+Los tests de integración levantan su propio Postgres temporal (no tocan tu base). Para usar uno existente: `TEST_DATABASE_URL=...`.
 
-To learn more about Next.js, take a look at the following resources:
+## Estructura
 
-- [Next.js Documentation](https://nextjs.org/docs) - learn about Next.js features and API.
-- [Learn Next.js](https://nextjs.org/learn) - an interactive Next.js tutorial.
-
-You can check out [the Next.js GitHub repository](https://github.com/vercel/next.js) - your feedback and contributions are welcome!
-
-## Deploy on Vercel
-
-The easiest way to deploy your Next.js app is to use the [Vercel Platform](https://vercel.com/new?utm_medium=default-template&filter=next.js&utm_source=create-next-app&utm_campaign=create-next-app-readme) from the creators of Next.js.
-
-Check out our [Next.js deployment documentation](https://nextjs.org/docs/app/building-your-application/deploying) for more details.
+```
+src/
+  app/                    rutas de Next.js
+  db/                     esquema Drizzle, cliente, migrador, seed
+  lib/                    utilidades puras (zonas horarias, cifrado, códigos)
+  server/
+    availability/         motor de disponibilidad (puro) + servicio con BD
+    appointments/         alta de turnos (única puerta de entrada)
+    patients/             alta/búsqueda de pacientes (datos cifrados)
+drizzle/                  migraciones SQL
+tests/integration/        tests contra Postgres real (concurrencia, reservas, seed)
+```
