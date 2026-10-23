@@ -10,7 +10,10 @@ import type { Actor } from "./rbac";
 
 /** Current admin user (re-read from the database on every request), or null. */
 export const getActor = cache(async (): Promise<Actor | null> => {
-  const session = await getAuth().api.getSession({ headers: await headers() });
+  // Read the request first: it marks the page as dynamic before anything touches
+  // the database, so `next build` never tries to prerender admin pages.
+  const h = await headers();
+  const session = await getAuth().api.getSession({ headers: h });
   if (!session) return null;
   const [u] = await getDb()
     .select({ id: users.id, name: users.name, email: users.email, role: users.role, clinicId: users.clinicId, active: users.active })

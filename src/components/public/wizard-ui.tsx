@@ -120,7 +120,7 @@ export function DayCalendar({ today, lastDay, available, hrefFor }: { today: str
                           <Link
                             href={hrefFor(c)}
                             aria-label={`${label}, hay turnos`}
-                            className="flex aspect-square items-center justify-center rounded-lg border border-primary/40 bg-card font-bold tabular-nums text-primary hover:border-tinta hover:bg-sol hover:text-tinta"
+                            className="flex aspect-square items-center justify-center rounded-lg border border-primary/40 bg-card font-bold tabular-nums text-primary hover:border-tinta hover:bg-sol hover:text-sol-foreground"
                           >
                             {n}
                           </Link>
@@ -155,10 +155,10 @@ export function SlotTickets({ groups }: { groups: { label: string; slots: { href
                 <li key={s.href}>
                   <Link
                     href={s.href}
-                    className="flex h-full flex-col items-center justify-center rounded-lg border-2 border-dashed border-primary/30 bg-card px-2 py-3 text-center hover:border-solid hover:border-tinta hover:bg-sol"
+                    className="group flex h-full flex-col items-center justify-center rounded-lg border-2 border-dashed border-primary/30 bg-card px-2 py-3 text-center hover:border-solid hover:border-tinta hover:bg-sol hover:text-sol-foreground"
                   >
                     <span className="text-xl font-bold tabular-nums">{s.time}</span>
-                    {s.detail ? <span className="text-xs leading-tight text-muted-foreground">{s.detail}</span> : null}
+                    {s.detail ? <span className="text-xs leading-tight text-muted-foreground group-hover:text-sol-foreground/80">{s.detail}</span> : null}
                   </Link>
                 </li>
               ))}

@@ -14,16 +14,18 @@ function DialogContent({
   children,
   side,
   ...props
-}: React.ComponentProps<typeof DialogPrimitive.Content> & { side?: "center" | "left" }) {
+}: React.ComponentProps<typeof DialogPrimitive.Content> & { side?: "center" | "left" | "bottom" }) {
   return (
     <DialogPrimitive.Portal>
-      <DialogPrimitive.Overlay className="fixed inset-0 z-50 bg-tinta/40 data-[state=open]:animate-in data-[state=open]:fade-in-0 data-[state=closed]:animate-out data-[state=closed]:fade-out-0" />
+      <DialogPrimitive.Overlay className="fixed inset-0 z-50 bg-overlay data-[state=open]:animate-in data-[state=open]:fade-in-0 data-[state=closed]:animate-out data-[state=closed]:fade-out-0" />
       <DialogPrimitive.Content
         className={cn(
           "fixed z-50 flex flex-col gap-4 overflow-y-auto border bg-card p-5 shadow-lg data-[state=open]:animate-in data-[state=closed]:animate-out",
           side === "left"
             ? "inset-y-0 left-0 h-full w-72 max-w-[85vw] data-[state=open]:slide-in-from-left data-[state=closed]:slide-out-to-left"
-            : "left-1/2 top-1/2 max-h-[90dvh] w-[calc(100%-2rem)] max-w-lg -translate-x-1/2 -translate-y-1/2 rounded-xl data-[state=open]:fade-in-0 data-[state=open]:zoom-in-95",
+            : side === "bottom"
+              ? "inset-x-0 bottom-0 max-h-[85dvh] rounded-t-2xl pb-[calc(1.25rem+env(safe-area-inset-bottom))] data-[state=open]:slide-in-from-bottom data-[state=closed]:slide-out-to-bottom"
+              : "left-1/2 top-1/2 max-h-[90dvh] w-[calc(100%-2rem)] max-w-lg -translate-x-1/2 -translate-y-1/2 rounded-xl data-[state=open]:fade-in-0 data-[state=open]:zoom-in-95",
           className,
         )}
         {...props}

@@ -11,7 +11,7 @@ const AlertDialogTrigger = P.Trigger;
 function AlertDialogContent({ className, ...props }: React.ComponentProps<typeof P.Content>) {
   return (
     <P.Portal>
-      <P.Overlay className="fixed inset-0 z-50 bg-tinta/40 data-[state=open]:animate-in data-[state=open]:fade-in-0" />
+      <P.Overlay className="fixed inset-0 z-50 bg-overlay data-[state=open]:animate-in data-[state=open]:fade-in-0" />
       <P.Content
         className={cn(
           "fixed left-1/2 top-1/2 z-50 flex w-[calc(100%-2rem)] max-w-md -translate-x-1/2 -translate-y-1/2 flex-col gap-4 rounded-xl border bg-card p-5 shadow-lg data-[state=open]:animate-in data-[state=open]:zoom-in-95",

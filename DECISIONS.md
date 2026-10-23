@@ -68,7 +68,7 @@ Registro de decisiones tomadas por default cuando el pedido era ambiguo. Cada un
 |---|----------|---------|
 | U1 | Componentes estilo **shadcn/ui escritos a mano** (Radix + CVA + Tailwind) en `src/components/ui`, con `components.json` para usar `shadcn add` después. | El registro de shadcn no era accesible desde el entorno de desarrollo. El resultado es el mismo código. |
 | U2 | Tipografía **Atkinson Hyperlegible Next**, servida desde la propia app (sin Google Fonts). Paleta eucalipto sobre blanco mineral; el amarillo «sol» marca solo lo importante del momento (horario elegido, hoy, la hora actual). | Diseñada para baja visión, pensando en pacientes mayores. Sin pedidos a terceros. |
-| U3 | Solo tema claro por ahora. | Menos superficie para revisar contraste. Se puede sumar. |
+| U3 | ~~Solo tema claro.~~ Reemplazada por X6 (tema claro y oscuro). | — |
 | U4 | Selects nativos en formularios, búsquedas por GET y pestañas por URL. | Funcionan sin JavaScript, son accesibles y el estado queda en la URL. |
 
 ## Reserva y cancelación del paciente (hito 3)
@@ -83,3 +83,40 @@ Registro de decisiones tomadas por default cuando el pedido era ambiguo. Cada un
 | R6 | La regla de cancelación es `ahora ≤ inicio − horas configuradas`. Justo en el límite se puede cancelar; un segundo después, no. Se evalúa con un `SELECT … FOR UPDATE` dentro de la transacción. | Lo pide el §6 y evita que dos cancelaciones simultáneas pasen las dos. |
 | R7 | Las páginas `/turno/*` envían `Referrer-Policy: no-referrer`, `noindex` y `no-store`. | El enlace lleva el token: no se puede filtrar por el Referer ni quedar en caché. |
 | R8 | El `.ics` usa horas UTC, una alarma 2 h antes, y `METHOD:CANCEL` si el turno se canceló. | Compatible con Google Calendar, Apple y Outlook. |
+
+## Asistente de IA (hito 4)
+
+| # | Decisión | Por qué |
+|---|----------|---------|
+| IA1 | **Cliente propio compatible con OpenAI** (`fetch`, sin SDK) para Groq, Gemini (endpoint `/v1beta/openai`) y OpenRouter. Se prueban en el orden de `LLM_PROVIDERS`; ante error HTTP, límite, respuesta vacía o `LLM_TIMEOUT_MS` sigue el siguiente. Cada intento, bueno o malo, queda en `llm_usage`. | Los tres hablan el mismo protocolo con herramientas. Menos dependencias y el respaldo es explícito. |
+| IA2 | Modelos por defecto: `llama-3.3-70b-versatile` (Groq), `gemini-2.5-flash` (Gemini), `meta-llama/llama-3.3-70b-instruct:free` (OpenRouter). Se cambian por variable. | Gratuitos y con herramientas en octubre de 2026. Los catálogos cambian seguido. |
+| IA3 | **El modelo nunca reserva ni cancela.** Sus herramientas solo buscan horarios (`buscar_horarios`) o muestran tarjetas (`ofrecer_reserva`, `gestionar_turno_existente`, `marcar_emergencia`). La reserva la confirma el paciente en la tarjeta, con su consentimiento, y pasa por `bookPublic` (la misma capa que el formulario, con revalidación en el servidor). | Un modelo puede equivocarse o ser manipulado. Lo irreversible lo decide una persona. |
+| IA4 | **Códigos cortos en vez de ids**: el prompt lista sedes `L1`, especialidades `E1`, consultas `C1` y profesionales `P1`; los horarios ofrecidos son `H1`, `H2`… y se guardan en `conversations.state`. El servidor solo acepta horarios que él mismo ofreció en esa conversación. | El modelo no puede inventar un horario, ni apuntar a otra clínica ni a un id interno. |
+| IA5 | **Datos personales fuera del modelo**: nombre, teléfono y email se cargan en la tarjeta (va directo al servidor). Lo que el paciente escriba con forma de email o de número largo (8+ dígitos: teléfono, DNI, tarjeta) se reemplaza antes de guardar y antes de llamar al modelo. Ver o cancelar un turno usa el mismo formulario seguro de `/turno` dentro del chat. | Ley 25.326, y los planes gratuitos pueden usar los textos para entrenar. |
+| IA6 | **Urgencias sin modelo**: una lista de frases (dolor en el pecho, falta de aire, desmayo, convulsión, suicidio…) dispara el mensaje de emergencia de la clínica y marca la conversación como «posible urgencia». «Turno urgente» no dispara. El modelo además puede llamar a `marcar_emergencia`. | No depender de que el modelo responda bien (o responda) ante una emergencia. |
+| IA7 | **Límites**: tokens por día entre todas las conversaciones (día local), tokens y mensajes por conversación, y rondas de herramientas por mensaje. Pasado un límite el chat ofrece el formulario y la conversación queda «límite de uso». | Evitar costos y abusos (D3). |
+| IA8 | La conversación se crea **con el primer mensaje** (no al abrir la página) y el navegador guarda un secreto propio de esa conversación (en la base solo su hash). Al recargar la página empieza una nueva. | Sin conversaciones vacías por bots o precargas; nadie puede continuar una conversación ajena conociendo su id. |
+| IA9 | **Retención**: las conversaciones se borran a los `CHAT_RETENTION_DAYS` días (30, como dice `/privacidad`; si se cambia, actualizar ese texto) y las inactivas por más de 24 h pasan a «sin terminar». Corre como mucho una vez por hora, al empezar una conversación. `llm_usage` se conserva sin el vínculo, para las estadísticas. | El registro sirve para auditar respuestas, no para acumular datos. |
+| IA10 | Las transcripciones las ve **administración** de la clínica (y superadmin); recepción no. Abrir una queda en auditoría. | Pueden contener información de salud que el paciente escribió. |
+| IA11 | `LLM_MOCK=1`: modelo simulado local que usa las herramientas reales. Para E2E y demos sin claves. | Tests deterministas y sin red. |
+| IA12 | Respuestas sin streaming: cada mensaje es una server action que devuelve el texto y las tarjetas. | Más simple y robusto; con los modelos rápidos la espera es corta. Streaming queda como mejora. |
+
+## Correcciones del hito 4
+
+| # | Decisión | Por qué |
+|---|----------|---------|
+| C1 | Las altas y movimientos de turnos toman un **lock transaccional por profesional** (`pg_advisory_xact_lock`) antes de revalidar. Si igual aparece un deadlock o un error de serialización, se reintenta. La restricción de exclusión sigue siendo la última barrera. | Con muchas reservas simultáneas del mismo horario Postgres detectaba deadlocks (~1 s cada uno) y uno se escapaba como error genérico en vez de «alguien tomó ese horario». El test de concurrencia fallaba de forma intermitente. |
+| C2 | La sesión del panel lee los headers **antes** de tocar la base. | `next build` sin `DATABASE_URL` fallaba al intentar prerenderizar `/admin` (rompía el E2E en CI). |
+| C3 | `scripts/e2e.ts` lanza Playwright con `shell` en Windows. | `pnpm` es un `.cmd` en Windows y fallaba sin mensaje. |
+
+## Mejoras de experiencia (después del hito 4)
+
+| # | Decisión | Por qué |
+|---|----------|---------|
+| X1 | Mientras no haya emails, ningún texto los promete. La confirmación muestra «Guardá este enlace» con **copiar** y **enviármelo por WhatsApp** (`wa.me`, sin número: el paciente elige el chat). | Era la única copia del enlace y la interfaz decía que llegaba por email. |
+| X2 | En el chat, al confirmar un turno se **descartan los horarios ofrecidos antes** (`state.offers = []`) y sus tarjetas se ven bloqueadas. | Evitar dos reservas por tocar una tarjeta vieja. |
+| X3 | El paso del día del formulario ofrece **«El próximo turno libre»**, que salta directo a la confirmación. | La mayoría quiere el primero disponible. |
+| X4 | La portada no promete «24 horas»: el plazo es por clínica y se muestra antes de confirmar. | Era un número fijo para un ajuste configurable. |
+| X5 | **Barra inferior en celular** (debajo de 768 px en el sitio y de 1024 px en el panel), con 4 accesos y una acción central elevada. Paciente: Inicio, Asistente, Reservar, Mi turno, Más. Panel (todos los roles): Inicio, Agenda (con globito de turnos de hoy), Nuevo turno, Pacientes, Más. «Más» abre una hoja desde abajo con el menú completo del rol. Reemplaza la hamburguesa del panel. | Pedido del usuario (estilo Mercado Pago): lo frecuente queda a un toque del pulgar y respeta el área segura del iPhone. |
+| X6 | **Tema claro/oscuro** con un solo botón (luna en claro, sol en oscuro; los íconos cambian con `dark:` en CSS, así se ve el correcto desde el primer cuadro). Sin elección guardada sigue al sistema operativo. Usa la variante `dark` de Tailwind sobre la clase `.dark` en `<html>`. Un script mínimo en `<head>` lo aplica antes de pintar (sin parpadeo) y la elección vive en `localStorage`. La paleta oscura es eucalipto sobre grafito, con contraste AA. El texto sobre el amarillo «sol» es siempre oscuro (`--sol-foreground`) y el texto sobre rojo tiene su propio token. Sin dependencias nuevas. | Pedido del usuario. Todo pasa por tokens, así que los componentes no necesitan cambios por tema. |
+| X7 | **Calendario de shadcn/ui** (`src/components/ui/calendar.tsx`, sobre `react-day-picker` 9, en español y con la semana empezando el lunes). En la agenda se usa en una **vista Mes** (turnos, ocupación, cancelados y feriados por día) y como **mini calendario** junto a Día y Semana. El resumen mensual (`getAgendaMonth`) suma la agenda semanal, así que respeta exactamente las mismas reglas de horarios y bloqueos, y los mismos permisos. | Pedido del usuario: ver el mes de un vistazo y saltar de fecha rápido. |

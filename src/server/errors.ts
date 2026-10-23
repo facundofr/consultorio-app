@@ -50,3 +50,5 @@ export function pgConstraint(err: unknown): string | undefined {
 
 export const PG_EXCLUSION_VIOLATION = "23P01";
 export const PG_UNIQUE_VIOLATION = "23505";
+export const PG_DEADLOCK = "40P01";
+export const PG_SERIALIZATION_FAILURE = "40001";

@@ -259,3 +259,60 @@ export async function getAgenda(
 
   return { timezone: tz, stepMinutes: settings.slotStepMinutes, view: p.view, mode: p.mode, date: p.date, days, startMinute, endMinute, columns, subject };
 }
+
+/* --------------------------------- Month ---------------------------------- */
+
+export type AgendaMonthDay = {
+  date: LocalDate;
+  /** Appointments that occupy the agenda (confirmed, attended, no-show). */
+  appointments: number;
+  cancelled: number;
+  openMinutes: number;
+  bookedMinutes: number;
+  /** Reason of a block covering the whole day (holiday, closure), if any. */
+  closedReason: string | null;
+};
+
+export type AgendaMonth = { timezone: string; month: string; days: Record<LocalDate, AgendaMonthDay> };
+
+const ACTIVE = new Set<string>(["confirmed", "completed", "no_show"]);
+
+/**
+ * Per-day summary of a month for the calendar view. Built from the weekly
+ * agenda so openings, blocks and appointments follow exactly the same rules.
+ */
+export async function getAgendaMonth(
+  db: Db,
+  actor: Actor,
+  clinicId: string,
+  p: { mode: AgendaMode; subjectId?: string | null; month: string },
+): Promise<AgendaMonth> {
+  if (!/^\d{4}-\d{2}$/.test(p.month)) throw new DomainError("VALIDATION", "Mes inválido.");
+  const first = `${p.month}-01`;
+  const [y, m] = p.month.split("-").map(Number);
+  const last = addDays(`${m === 12 ? y + 1 : y}-${String(m === 12 ? 1 : m + 1).padStart(2, "0")}-01`, -1);
+  const days: Record<LocalDate, AgendaMonthDay> = {};
+  let timezone = "";
+
+  for (let start = weekStart(first); start <= last; start = addDays(start, 7)) {
+    const week = await getAgenda(db, actor, clinicId, { view: "week", mode: p.mode, date: start, subjectId: p.subjectId, includeCancelled: true });
+    timezone = week.timezone;
+    const ms = (iso: string) => new Date(iso).getTime();
+    for (const c of week.columns) {
+      if (c.date < first || c.date > last) continue;
+      const dayStart = localToUtc(c.date, 0, week.timezone).getTime();
+      const dayEnd = localToUtc(addDays(c.date, 1), 0, week.timezone).getTime();
+      const active = c.appointments.filter((a) => ACTIVE.has(a.status));
+      const closed = c.blocks.find((b) => ms(b.start) <= dayStart && ms(b.end) >= dayEnd);
+      days[c.date] = {
+        date: c.date,
+        appointments: active.length,
+        cancelled: c.appointments.length - active.length,
+        openMinutes: Math.round(c.open.reduce((n, o) => n + (ms(o.end) - ms(o.start)), 0) / 60_000),
+        bookedMinutes: Math.round(active.reduce((n, a) => n + (ms(a.endsAt) - ms(a.startsAt)), 0) / 60_000),
+        closedReason: closed ? (closed.reason ?? "Cerrado") : null,
+      };
+    }
+  }
+  return { timezone, month: p.month, days };
+}

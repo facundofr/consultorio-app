@@ -1,6 +1,7 @@
 import { CheckCircle2 } from "lucide-react";
 import type { Metadata } from "next";
 import { AppointmentDetails, CalendarLink } from "@/components/public/appointment-details";
+import { SaveLink } from "@/components/public/save-link";
 import { StepHeading } from "@/components/public/wizard-ui";
 import { getDb } from "@/db/client";
 import { findAppointmentPublic } from "@/server/booking/public";
@@ -51,12 +52,19 @@ export default async function AppointmentByLinkPage({ params, searchParams }: Pa
           <CheckCircle2 className="mt-1 size-7 shrink-0 text-primary" aria-hidden />
           <div>
             <h1 className="text-2xl font-bold tracking-tight sm:text-3xl">¡Listo, {view.patientFirstName}! Tu turno está confirmado</h1>
-            <p className="text-muted-foreground">Guardá el código <span className="font-semibold text-foreground">{view.code}</span>. También te lo mandamos por email.</p>
+            <p className="text-muted-foreground">Código <span className="font-semibold text-foreground">{view.code}</span>.</p>
           </div>
         </div>
       ) : (
         <StepHeading title="Tu turno" />
       )}
+      {isNew && view.status === "confirmed" ? (
+        <SaveLink
+          code={view.code}
+          path={`/turno/${view.code}?t=${encodeURIComponent(token)}`}
+          summary={`${view.when}, ${view.professionalName}, ${view.location.name}`}
+        />
+      ) : null}
       <AppointmentDetails
         view={view}
         actions={

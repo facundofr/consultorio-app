@@ -5,6 +5,7 @@ import { appointmentEvents, appointments, type AppointmentStatus } from "@/db/sc
 import { getAvailableSlots, loadBookingContext } from "@/server/availability/service";
 import { getClinicContext } from "@/server/clinics/settings";
 import { DomainError, PG_EXCLUSION_VIOLATION, pgErrorCode } from "@/server/errors";
+import { lockProfessionalAgenda } from "./lock";
 
 export type AppointmentRow = typeof appointments.$inferSelect;
 
@@ -118,6 +119,7 @@ export async function rescheduleAppointment(
         locationId: input.locationId ?? appt.locationId,
         serviceId: input.serviceId ?? appt.serviceId,
       };
+      await lockProfessionalAgenda(tx, target.professionalId);
       const bc = await loadBookingContext(tx, target);
       if (bc.clinic.id !== appt.clinicId) throw new DomainError("FORBIDDEN", "No se puede mover a otra clínica.");
       if (!bc.locationIds.includes(target.locationId)) throw new DomainError("VALIDATION", "Ese profesional no atiende en esa sede.");

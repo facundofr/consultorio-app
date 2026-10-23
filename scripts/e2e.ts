@@ -91,7 +91,9 @@ async function main() {
     await writeFixtures(holder.db);
     await holder.sql.end();
 
-    const res = spawnSync("pnpm", ["exec", "playwright", "test", ...pwArgs], { stdio: "inherit", env });
+    // On Windows pnpm is a .cmd shim, which only runs through a shell.
+    const res = spawnSync("pnpm", ["exec", "playwright", "test", ...pwArgs], { stdio: "inherit", env, shell: process.platform === "win32" });
+    if (res.error) console.error(res.error);
     code = res.status ?? 1;
   } finally {
     await pg.stop();

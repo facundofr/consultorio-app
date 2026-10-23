@@ -1,6 +1,15 @@
 import Link from "next/link";
+import { connection } from "next/server";
+import { PublicTabBar } from "@/components/public/public-tab-bar";
+import { TAB_BAR_PADDING } from "@/components/tab-bar";
+import { ThemeToggle } from "@/components/theme";
+import { cn } from "@/lib/utils";
+import { assistantConfig } from "@/server/assistant/config";
 
-export default function PublicLayout({ children }: { children: React.ReactNode }) {
+export default async function PublicLayout({ children }: { children: React.ReactNode }) {
+  // The assistant can be switched on or off with env vars: decide per request.
+  await connection();
+  const assistant = assistantConfig().enabled;
   return (
     <div className="flex min-h-dvh flex-col">
       <a href="#contenido" className="sr-only focus:not-sr-only focus:absolute focus:left-4 focus:top-4 focus:z-50 focus:rounded-md focus:bg-card focus:px-3 focus:py-2">
@@ -16,21 +25,24 @@ export default function PublicLayout({ children }: { children: React.ReactNode }
             </svg>
             Turnos IA
           </Link>
-          <nav aria-label="Principal" className="flex items-center gap-1 text-sm font-semibold">
+          <nav aria-label="Principal" className="ml-auto mr-1 hidden items-center gap-1 text-sm font-semibold md:flex">
             <Link href="/reservar" className="rounded-md px-3 py-2 hover:bg-muted">Reservar</Link>
+            {assistant ? <Link href="/asistente" className="rounded-md px-3 py-2 hover:bg-muted">Asistente</Link> : null}
             <Link href="/turno" className="rounded-md px-3 py-2 hover:bg-muted">Mi turno</Link>
           </nav>
+          <ThemeToggle compact className="md:-ml-2" />
         </div>
       </header>
       <main id="contenido" className="mx-auto flex w-full max-w-3xl flex-1 flex-col px-4 py-8 sm:py-12">
         {children}
       </main>
-      <footer className="border-t">
+      <footer className={cn("border-t", TAB_BAR_PADDING, "md:pb-0")}>
         <div className="mx-auto flex w-full max-w-3xl flex-wrap gap-x-6 gap-y-2 px-4 py-6 text-sm text-muted-foreground">
           <Link href="/privacidad" className="underline-offset-4 hover:underline">Privacidad y datos personales</Link>
           <span>Ante una emergencia llamá al 911.</span>
         </div>
       </footer>
+      <PublicTabBar assistant={assistant} />
     </div>
   );
 }

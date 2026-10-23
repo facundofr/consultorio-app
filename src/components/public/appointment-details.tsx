@@ -26,7 +26,7 @@ export function AppointmentDetails({ view, actions }: { view: ClientAppointmentV
   return (
     <article className="flex flex-col gap-6" aria-labelledby="turno-titulo">
       <div className={`grid gap-4 rounded-xl border-2 bg-card p-5 sm:grid-cols-[auto_1fr] sm:items-center sm:gap-6 ${cancelled ? "border-border opacity-80" : "border-tinta"}`}>
-        <div className={`flex flex-col items-center justify-center rounded-lg px-5 py-3 ${cancelled ? "bg-muted text-muted-foreground line-through" : "bg-sol text-tinta"}`}>
+        <div className={`flex flex-col items-center justify-center rounded-lg px-5 py-3 ${cancelled ? "bg-muted text-muted-foreground line-through" : "bg-sol text-sol-foreground"}`}>
           <span className="text-sm font-semibold first-letter:uppercase">{weekday}</span>
           <span className="text-3xl font-bold tabular-nums">{view.time}</span>
           <span className="text-sm font-semibold">{rest.join(", ").replace(/, \d{2}:\d{2} h$/, "")}</span>

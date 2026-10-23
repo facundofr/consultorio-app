@@ -12,7 +12,6 @@ import {
   ListChecks,
   LogOut,
   MapPin,
-  Menu,
   MessagesSquare,
   Settings,
   Stethoscope,
@@ -23,7 +22,9 @@ import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { useState } from "react";
 import { Button } from "@/components/ui/button";
-import { Dialog, DialogContent, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
+import { TabBar } from "@/components/tab-bar";
+import { ThemeToggle } from "@/components/theme";
+import { Dialog, DialogContent, DialogTitle } from "@/components/ui/dialog";
 import { NativeSelect } from "@/components/ui/input";
 import { cn } from "@/lib/utils";
 
@@ -124,6 +125,9 @@ export function AdminSidebar(props: {
   activeClinicId: string | null;
   switchClinic: (fd: FormData) => Promise<void>;
   logout: () => Promise<void>;
+  /** Confirmed appointments today, shown as a badge on "Agenda" (mobile bar). */
+  todayCount: number;
+  canBook: boolean;
 }) {
   const [open, setOpen] = useState(false);
   const body = (onNavigate?: () => void) => (
@@ -135,7 +139,8 @@ export function AdminSidebar(props: {
         <ClinicSwitcher clinics={props.clinics} activeId={props.activeClinicId} action={props.switchClinic} />
       </div>
       <NavLinks groups={props.groups} onNavigate={onNavigate} />
-      <div className="mt-auto flex flex-col gap-2 border-t pt-4">
+      <div className="mt-auto flex flex-col gap-3 border-t pt-4">
+        <ThemeToggle className="w-full justify-start px-3" />
         <div className="px-3">
           <p className="text-sm font-semibold">{props.user.name}</p>
           <p className="text-xs text-muted-foreground">{props.user.roleLabel}</p>
@@ -151,20 +156,38 @@ export function AdminSidebar(props: {
 
   return (
     <>
-      <header className="sticky top-0 z-40 flex h-14 items-center gap-2 border-b bg-card px-4 lg:hidden">
-        <Dialog open={open} onOpenChange={setOpen}>
-          <DialogTrigger asChild>
-            <Button variant="ghost" size="icon" aria-label="Abrir menú">
-              <Menu />
-            </Button>
-          </DialogTrigger>
-          <DialogContent side="left" aria-describedby={undefined}>
-            <DialogTitle className="sr-only">Menú</DialogTitle>
-            {body(() => setOpen(false))}
-          </DialogContent>
-        </Dialog>
-        <span className="font-bold text-primary">Turnos IA</span>
+      <header className="sticky top-0 z-40 flex h-14 items-center justify-between gap-2 border-b bg-card px-4 lg:hidden">
+        <Link href="/admin" className="font-bold text-primary">Turnos IA</Link>
+        <span className="flex min-w-0 items-center gap-1">
+          <span className="truncate text-sm font-semibold text-muted-foreground">
+            {props.clinics.find((c) => c.id === props.activeClinicId)?.name}
+          </span>
+          <ThemeToggle compact />
+        </span>
       </header>
+      <TabBar
+        left={[
+          { href: "/admin", label: "Inicio", icon: "house" },
+          {
+            href: "/admin/agenda",
+            match: "/admin/agenda",
+            label: "Agenda",
+            icon: "calendar",
+            badge: props.todayCount,
+            badgeLabel: `${props.todayCount} turno${props.todayCount === 1 ? "" : "s"} hoy`,
+          },
+        ]}
+        center={props.canBook ? { href: "/admin/agenda?nuevo=1", label: "Nuevo turno", icon: "calendarPlus" } : { href: "/admin/turnos", match: "/admin/turnos", label: "Turnos", icon: "ticket" }}
+        right={[{ href: "/admin/pacientes", match: "/admin/pacientes", label: "Pacientes", icon: "users" }]}
+        onMore={() => setOpen(true)}
+        moreOpen={open}
+      />
+      <Dialog open={open} onOpenChange={setOpen}>
+        <DialogContent side="bottom" aria-describedby={undefined} className="lg:hidden">
+          <DialogTitle className="sr-only">Más opciones</DialogTitle>
+          {body(() => setOpen(false))}
+        </DialogContent>
+      </Dialog>
       <aside className="hidden w-64 shrink-0 border-r bg-card px-3 py-5 lg:sticky lg:top-0 lg:block lg:h-dvh lg:overflow-y-auto">
         {body()}
       </aside>

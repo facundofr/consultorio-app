@@ -1,4 +1,5 @@
 import type { Metadata, Viewport } from "next";
+import { THEME_SCRIPT } from "@/lib/theme-script";
 import "./globals.css";
 
 export const metadata: Metadata = {
@@ -9,11 +10,21 @@ export const metadata: Metadata = {
 export const viewport: Viewport = {
   width: "device-width",
   initialScale: 1,
+  // Lets the mobile tab bar sit above the iPhone home indicator (safe-area insets).
+  viewportFit: "cover",
+  themeColor: [
+    { media: "(prefers-color-scheme: light)", color: "#ffffff" },
+    { media: "(prefers-color-scheme: dark)", color: "#141c1f" },
+  ],
 };
 
 export default function RootLayout({ children }: LayoutProps<"/">) {
   return (
-    <html lang="es-AR" className="h-full antialiased">
+    // The theme script sets class="dark" before React hydrates.
+    <html lang="es-AR" className="h-full antialiased" suppressHydrationWarning>
+      <head>
+        <script dangerouslySetInnerHTML={{ __html: THEME_SCRIPT }} />
+      </head>
       <body className="min-h-full flex flex-col">{children}</body>
     </html>
   );

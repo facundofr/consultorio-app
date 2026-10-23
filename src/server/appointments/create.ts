@@ -6,12 +6,15 @@ import { generateAppointmentCode, generateCancelToken, hashToken } from "@/lib/c
 import { getAvailableSlots, loadBookingContext } from "@/server/availability/service";
 import {
   DomainError,
+  PG_DEADLOCK,
   PG_EXCLUSION_VIOLATION,
+  PG_SERIALIZATION_FAILURE,
   PG_UNIQUE_VIOLATION,
   pgConstraint,
   pgErrorCode,
 } from "@/server/errors";
 import { PatientInput, upsertPatient } from "@/server/patients/service";
+import { lockProfessionalAgenda } from "./lock";
 
 export const CreateAppointmentInput = z.object({
   professionalId: z.string().uuid(),
@@ -26,6 +29,8 @@ export const CreateAppointmentInput = z.object({
   notes: z.string().max(1000).optional(),
 }).refine((v) => !!v.patient !== !!v.patientId, { message: "Indicá los datos del paciente.", path: ["patient"] });
 export type CreateAppointmentInput = z.input<typeof CreateAppointmentInput>;
+
+const MAX_ATTEMPTS = 5;
 
 export type CreateAppointmentOptions = {
   source: AppointmentSource;
@@ -66,10 +71,11 @@ export async function createAppointment(
     throw new DomainError("VALIDATION", "Necesitamos tu consentimiento para guardar tus datos y reservar el turno.");
   }
 
-  for (let attempt = 0; attempt < 3; attempt++) {
+  for (let attempt = 0; attempt < MAX_ATTEMPTS; attempt++) {
     const cancelToken = generateCancelToken();
     try {
       const appointment = await db.transaction(async (tx) => {
+        await lockProfessionalAgenda(tx, input.professionalId);
         const bc = await loadBookingContext(tx, input);
         const endsAt = new Date(input.startsAt.getTime() + bc.service.durationMinutes * 60_000);
 
@@ -147,6 +153,16 @@ export async function createAppointment(
       }
       if (code === PG_UNIQUE_VIOLATION && pgConstraint(err)?.includes("code")) {
         continue; // appointment code collision: retry with a new code
+      }
+      if (code === PG_DEADLOCK || code === PG_SERIALIZATION_FAILURE) {
+        // Concurrent inserts on the same slot can deadlock while checking the
+        // exclusion constraint. Postgres aborts one of them: retry it, and the
+        // availability re-check then reports the slot as taken.
+        if (attempt < MAX_ATTEMPTS - 1) {
+          await new Promise((r) => setTimeout(r, 10 + Math.random() * 40));
+          continue;
+        }
+        throw new DomainError("SLOT_TAKEN", "Uy, alguien acaba de tomar ese horario. Elegí otro, por favor.");
       }
       throw err;
     }

@@ -44,6 +44,7 @@ export function AgendaGrid({
   canWrite,
   canForce,
   presetPatient,
+  autoOpenBooking = false,
   nowIso,
 }: {
   data: AgendaData;
@@ -51,10 +52,12 @@ export function AgendaGrid({
   canWrite: boolean;
   canForce: boolean;
   presetPatient: { id: string; fullName: string } | null;
+  /** Open the booking dialog right away (the mobile "Nuevo turno" button). */
+  autoOpenBooking?: boolean;
   nowIso: string;
 }) {
   const tz = data.timezone;
-  const [booking, setBooking] = useState<BookingPrefill | null>(presetPatient ? { date: data.date, professionalId: data.mode === "professional" ? data.subject?.id : undefined } : null);
+  const [booking, setBooking] = useState<BookingPrefill | null>((presetPatient || (autoOpenBooking && canWrite)) ? { date: data.date, professionalId: data.mode === "professional" ? data.subject?.id : undefined } : null);
   const [selected, setSelected] = useState<AgendaAppointment | null>(null);
   const [moving, setMoving] = useState<AgendaAppointment | null>(null);
   const [now, setNow] = useState(() => localParts(nowIso, tz));

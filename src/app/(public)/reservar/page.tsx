@@ -6,7 +6,6 @@ import { serverNow } from "@/lib/clock";
 import { utcToLocal } from "@/lib/time";
 import { formatMoney } from "@/server/admin/common";
 import {
-  availableDays,
   findSlots,
   getClinicInfo,
   listClinicsPublic,
@@ -171,14 +170,35 @@ export default async function BookingPage({ searchParams }: PageProps<"/reservar
 
   /* 6. Day */
   if (!st.dia) {
-    const { days } = await availableDays(db, slotQuery, now);
+    const { slots: all } = await findSlots(db, slotQuery, now);
+    const days = [...new Set(all.map((s) => s.localDate))];
+    const first = all[0];
     const today = utcToLocal(now, tz).date;
     const last = utcToLocal(new Date(now.getTime() + info.bookingHorizonDays * 86_400_000), tz).date;
     return (
       <>
         <ChoicesSummary items={summary} />
+        {first ? (
+          <a
+            href={href(st, { dia: first.localDate, hora: first.startsAt, en: first.locationId, con: first.professionalId })}
+            className="group mb-8 flex flex-col gap-1 rounded-xl border-2 border-tinta bg-sol-claro px-4 py-3 hover:bg-sol hover:text-sol-foreground focus-visible:bg-sol focus-visible:text-sol-foreground sm:flex-row sm:items-center sm:justify-between"
+          >
+            <span>
+              <span className="block text-sm font-semibold text-muted-foreground group-hover:text-sol-foreground/80 group-focus-visible:text-sol-foreground/80">El próximo turno libre</span>
+              <span className="block text-lg font-bold first-letter:uppercase">
+                {longDate(first.localDate)}, {first.localTime} h
+              </span>
+              <span className="block text-sm">
+                {[!professional ? profs.find((p) => p.id === first.professionalId)?.name : null, !location && locs.length > 1 ? locs.find((l) => l.id === first.locationId)?.name : null]
+                  .filter(Boolean)
+                  .join(", ")}
+              </span>
+            </span>
+            <span className="font-bold text-primary underline underline-offset-4 group-hover:text-sol-foreground group-focus-visible:text-sol-foreground">Reservar este</span>
+          </a>
+        ) : null}
         <StepHeading title="¿Qué día te queda bien?">
-          {days.length ? `Los días marcados tienen horarios libres. ${days.length === 1 ? "Hay 1 día disponible." : `Hay ${days.length} días disponibles.`}` : null}
+          {days.length ? `${first ? "O elegí otro: los" : "Los"} días marcados tienen horarios libres. ${days.length === 1 ? "Hay 1 día disponible." : `Hay ${days.length} días disponibles.`}` : null}
         </StepHeading>
         {days.length ? (
           <DayCalendar today={today} lastDay={last} available={days} hrefFor={(d) => href(st, { dia: d })} />
@@ -237,7 +257,7 @@ export default async function BookingPage({ searchParams }: PageProps<"/reservar
     <>
       <StepHeading title="Revisá y confirmá tu turno" />
       <div className="mb-8 grid gap-4 rounded-xl border-2 border-tinta bg-card p-5 sm:grid-cols-[auto_1fr] sm:items-center sm:gap-6">
-        <div className="flex flex-col items-center justify-center rounded-lg bg-sol px-5 py-3 text-tinta">
+        <div className="flex flex-col items-center justify-center rounded-lg bg-sol px-5 py-3 text-sol-foreground">
           <span className="text-sm font-semibold first-letter:uppercase">{longDate(chosen.localDate).split(",")[0]}</span>
           <span className="text-3xl font-bold tabular-nums">{chosen.localTime}</span>
           <span className="text-sm font-semibold">{longDate(chosen.localDate).split(", ")[1]}</span>

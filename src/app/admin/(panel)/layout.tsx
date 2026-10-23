@@ -1,7 +1,13 @@
 import type { Metadata } from "next";
+import { and, count, eq, gte, lt } from "drizzle-orm";
 import { AdminSidebar, type NavGroup } from "@/components/admin/nav";
+import { TAB_BAR_PADDING } from "@/components/tab-bar";
 import { Toaster } from "@/components/ui/sonner";
-import { getDb } from "@/db/client";
+import { getDb, type Db } from "@/db/client";
+import { appointments } from "@/db/schema";
+import { localDayBounds, utcToLocal } from "@/lib/time";
+import { cn } from "@/lib/utils";
+import { getClinicContext } from "@/server/clinics/settings";
 import { listClinics } from "@/server/admin/clinics";
 import { can, ROLE_LABELS } from "@/server/auth/rbac";
 import { requireAdminContext } from "@/server/auth/session";
@@ -9,9 +15,21 @@ import { logoutAction, switchClinicAction } from "../_actions/session";
 
 export const metadata: Metadata = { title: { default: "Panel", template: "%s · Panel · Turnos IA" }, robots: { index: false } };
 
+/** Confirmed appointments today in the clinic (badge on the mobile "Agenda" tab). */
+async function confirmedToday(db: Db, clinicId: string) {
+  const { clinic } = await getClinicContext(db, clinicId);
+  const { start, end } = localDayBounds(utcToLocal(new Date(), clinic.timezone).date, clinic.timezone);
+  const [r] = await db
+    .select({ n: count() })
+    .from(appointments)
+    .where(and(eq(appointments.clinicId, clinicId), eq(appointments.status, "confirmed"), gte(appointments.startsAt, start), lt(appointments.startsAt, end)));
+  return r?.n ?? 0;
+}
+
 export default async function PanelLayout({ children }: LayoutProps<"/admin">) {
   const { actor, clinicId } = await requireAdminContext();
-  const clinics = await listClinics(getDb(), actor);
+  const db = getDb();
+  const [clinics, todayCount] = await Promise.all([listClinics(db, actor), clinicId ? confirmedToday(db, clinicId) : 0]);
 
   const groups: NavGroup[] = [
     {
@@ -54,8 +72,10 @@ export default async function PanelLayout({ children }: LayoutProps<"/admin">) {
         activeClinicId={clinicId}
         switchClinic={switchClinicAction}
         logout={logoutAction}
+        todayCount={todayCount}
+        canBook={can(actor, "write", "appointments")}
       />
-      <main id="contenido" className="min-w-0 flex-1 px-4 py-6 sm:px-6 lg:px-10 lg:py-8">
+      <main id="contenido" className={cn("min-w-0 flex-1 px-4 pt-6 sm:px-6 lg:px-10 lg:py-8", TAB_BAR_PADDING, "lg:pb-8")}>
         {clinicId || actor.role === "superadmin" ? children : <p>Tu usuario no tiene una clínica asignada. Pedile a un administrador que la configure.</p>}
       </main>
       <Toaster />

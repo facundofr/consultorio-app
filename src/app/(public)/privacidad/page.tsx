@@ -19,6 +19,10 @@ export default function PrivacyPage() {
       <p>
         Tu teléfono y tu email se guardan cifrados. Las conversaciones con el asistente se guardan solo para controlar la calidad del servicio y se borran automáticamente a los 30 días. El acceso del equipo de la clínica queda registrado.
       </p>
+      <h2 className="text-xl font-semibold">El asistente de IA</h2>
+      <p>
+        Para entender lo que escribís, el asistente envía tus mensajes a un proveedor externo de inteligencia artificial (Groq, Google Gemini u OpenRouter). Antes de enviarlos borramos cualquier teléfono, email o número de documento que aparezca, y tu nombre, teléfono y email de la reserva nunca pasan por el asistente: los cargás en un formulario aparte. El asistente no da consejos médicos. Si preferís no usarlo, podés reservar con el formulario.
+      </p>
       <h2 className="text-xl font-semibold">Tus derechos</h2>
       <p>
         Según la Ley 25.326 de Protección de Datos Personales, podés pedir acceso, rectificación o supresión de tus datos comunicándote con la clínica. La Agencia de Acceso a la Información Pública, órgano de control de la ley, atiende las denuncias y reclamos relacionados con el incumplimiento de las normas sobre protección de datos personales.

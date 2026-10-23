@@ -2,7 +2,7 @@
 
 Reserva de turnos médicos online: el paciente conversa con un asistente de IA (o usa un formulario) y el equipo de la clínica gestiona todo desde `/admin`.
 
-> Estado: **hito 3 de 6**. Están listos el esquema, el seed, el motor de disponibilidad, el panel de administración, la reserva por formulario y la cancelación. Ver [`DECISIONS.md`](./DECISIONS.md).
+> Estado: **hito 4 de 6**. Están listos el esquema, el seed, el motor de disponibilidad, el panel de administración, la reserva por formulario, la cancelación y el **asistente de IA**. Ver [`DECISIONS.md`](./DECISIONS.md). Guía completa de funcionalidades: [`GUIA.md`](./GUIA.md). Lo que falta: [`PENDIENTES.md`](./PENDIENTES.md).
 
 ## Requisitos
 
@@ -45,9 +45,24 @@ En Windows sin openssl: `node -e "console.log(require('crypto').randomBytes(32).
 - **`/reservar`**: reserva paso a paso: clínica → sede → especialidad → profesional (o «el primero disponible») → tipo de consulta → día (solo se marcan días con horarios libres reales) → horario → datos y consentimiento → confirmación. Los pasos con una sola opción se saltean solos. El estado vive en la URL: funciona sin JavaScript y el botón «atrás» del navegador sirve.
 - **`/turno/[código]?t=…`**: el enlace del email. Muestra el turno, «Agregar al calendario (.ics)» y el botón para cancelar si faltan más de las horas configuradas (24 por defecto). Pasado ese plazo muestra el teléfono de la clínica. Después de cancelar ofrece elegir otro horario con el mismo profesional.
 - **`/turno`**: ver o cancelar con el **código + teléfono o email** usados al reservar.
+- **`/asistente`**: chat para sacar, ver o cancelar un turno escribiendo (ver abajo).
 - **`/privacidad`**: política de datos personales (Ley 25.326).
 
 La regla de cancelación se evalúa **en el servidor, dentro de la transacción y con la hora del servidor**. Tests de borde: 24 h 00 m 00 s (se puede), 23 h 59 m 59 s (no), ya pasado, ya cancelado y cancelación doble simultánea (solo una gana).
+
+## Asistente de IA (`/asistente`)
+
+El paciente escribe («quiero un turno con cardiología el martes a la mañana») y el asistente busca horarios **reales** y los muestra como botones. Al tocar uno aparece una tarjeta para confirmar con nombre, teléfono, email y consentimiento: **la reserva la confirma el paciente, no el modelo**, y pasa por la misma capa que el formulario.
+
+- **Proveedores gratuitos** (Groq, Gemini, OpenRouter), en el orden de `LLM_PROVIDERS`. Si uno falla, tarda más de `LLM_TIMEOUT_MS` o pone límite, sigue el siguiente. Si fallan todos, ofrece el formulario y el teléfono.
+- **Sin claves, apagado**: si no hay ninguna clave (o `AI_ENABLED=false`), `/asistente` lleva al formulario y la portada no lo ofrece.
+- **Límites**: tokens por día entre todas las conversaciones (`LLM_DAILY_TOKEN_LIMIT`), por conversación y mensajes por conversación. Pasado el límite el chat pasa solo al formulario. 30 mensajes cada 10 minutos por IP.
+- **Datos personales**: el modelo nunca los ve. Nombre, teléfono y email se cargan en la tarjeta, que va directo al servidor. Si el paciente los escribe en el chat igual, se reemplazan por «[número]» o «[email]» antes de guardar y antes de llamar al modelo.
+- **Urgencias**: si el mensaje parece una emergencia («dolor en el pecho», «no puede respirar»…) responde con el mensaje de emergencia de la clínica (911 / SAME 107) **sin llamar al modelo**.
+- **Qué sabe**: solo el catálogo activo de la clínica (sedes, especialidades, tipos de consulta, profesionales), los datos de contacto, la regla de cancelación y la FAQ. No da consejos médicos.
+- **Sin claves para probar**: `LLM_MOCK=1` usa un modelo simulado local que entiende «turno de cardiología», «H3» o «cancelar mi turno». Lo usan los tests E2E.
+
+Para sacar una clave gratis: [console.groq.com](https://console.groq.com/keys), [aistudio.google.com](https://aistudio.google.com/apikey) u [openrouter.ai](https://openrouter.ai/keys). Los nombres de modelos cambian seguido: si un proveedor devuelve error 404, revisá `GROQ_MODEL`, `GEMINI_MODEL` u `OPENROUTER_MODEL`. El panel muestra el error de cada llamada.
 
 ## Panel de administración (`/admin`)
 
@@ -58,6 +73,7 @@ La regla de cancelación se evalúa **en el servidor, dentro de la transacción 
 - **Feriados y bloqueos**: de toda la clínica, de una sede o de un profesional. Al cargarlos avisa si hay turnos confirmados afectados.
 - **Sedes, especialidades, tipos de consulta y preguntas frecuentes** (la FAQ es lo único que usa el asistente para responder).
 - **Ajustes** por clínica: horas para cancelar (24 por defecto), grilla, horizonte, anticipación, recordatorio, textos del asistente, contacto y mensajes.
+- **Conversaciones del asistente** (administración): listado por fecha y estado (reservó, posible urgencia, límite de uso, sin terminar) y ficha con la transcripción, las herramientas que usó, el turno resultante y cada llamada al modelo con proveedor, tokens, demora y errores. Abrir una transcripción queda en auditoría. Se borran solas a los `CHAT_RETENTION_DAYS` días (30 por defecto, lo que dice la política de privacidad).
 - **Usuarios** y roles, **auditoría** de acciones del equipo y **dashboard** (turnos del día, ocupación, cancelaciones, origen de las reservas y uso del LLM).
 
 ## Scripts
@@ -94,6 +110,8 @@ src/
     appointments/         alta, cancelación, reprogramación y estados (única puerta de entrada)
     admin/                servicios del panel, todos con control de permisos y auditoría
     auth/                 Better Auth, roles y permisos, sesión
+    assistant/            asistente: proveedores LLM, herramientas, prompt, urgencias, redacción
+    booking/              capa pública compartida por formulario y asistente
 drizzle/                  migraciones SQL
 tests/integration/        tests contra Postgres real (concurrencia, permisos, reservas…)
 tests/e2e/                Playwright

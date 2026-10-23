@@ -28,7 +28,7 @@ export default async function DashboardPage() {
   const active = d.todayAppointments.filter((a) => !a.status.startsWith("cancelled"));
   const sources = (["ai", "form", "admin"] as const).map((k) => ({ key: k, label: SOURCE_LABELS[k], n: d.bySource[k] ?? 0 }));
   const totalSrc = sources.reduce((s, x) => s + x.n, 0);
-  const SRC_COLOR = { ai: "bg-primary", form: "bg-sol", admin: "bg-tinta/40" } as const;
+  const SRC_COLOR = { ai: "bg-primary", form: "bg-sol", admin: "bg-chart-3" } as const;
   const noShow = d.byStatus.no_show ?? 0;
   const attended = d.byStatus.completed ?? 0;
 

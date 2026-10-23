@@ -76,7 +76,7 @@ export function SlotPicker({
                     onClick={() => onChange(selected ? null : s)}
                     className={cn(
                       "rounded-md border bg-card px-2.5 py-1.5 text-sm font-semibold tabular-nums hover:border-primary",
-                      selected && "border-tinta bg-sol text-tinta hover:border-tinta",
+                      selected && "border-tinta bg-sol text-sol-foreground hover:border-tinta",
                     )}
                   >
                     {s.localTime}

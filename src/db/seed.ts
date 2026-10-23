@@ -123,7 +123,7 @@ const SPECIALTIES: Record<string, { clinic: string; name: string; services: [str
 const FAQ = (clinicName: string, phone: string): [string, string, string[]][] => [
   ["¿Qué tengo que llevar al turno?", "Traé tu DNI y la credencial de tu cobertura. Si tenés estudios previos relacionados con la consulta, traelos también.", ["documentacion"]],
   ["¿Con cuánta anticipación tengo que llegar?", "Te pedimos llegar 10 minutos antes para hacer la admisión en recepción.", ["llegada"]],
-  ["¿Cómo cancelo un turno?", "Podés cancelar desde el enlace que te llegó por email o desde este chat con tu código de turno y tu teléfono o email, hasta 24 horas antes. Pasado ese plazo, llamá a la clínica.", ["cancelacion"]],
+  ["¿Cómo cancelo un turno?", "Podés cancelar desde el enlace que ves al confirmar la reserva, desde «Mi turno» o desde este chat con tu código de turno y tu teléfono o email, hasta 24 horas antes. Pasado ese plazo, llamá a la clínica.", ["cancelacion"]],
   ["¿Qué coberturas aceptan?", `En ${clinicName} atendemos afiliados de las prepagas y obras sociales con convenio y también en forma particular. Consultá tu plan llamando al ${phone}.`, ["coberturas"]],
   ["¿Puedo ir acompañado?", "Sí, podés venir con un acompañante. Los menores de edad tienen que venir con una persona adulta responsable.", ["acompanante"]],
   ["¿Hay estacionamiento?", "No tenemos estacionamiento propio. Hay estacionamientos pagos en la zona.", ["estacionamiento"]],

@@ -18,7 +18,7 @@ export function PatientForm({
       <TextField name="fullName" label="Nombre y apellido" required defaultValue={initial?.fullName} autoComplete="off" />
       <div className="grid gap-5 sm:grid-cols-2">
         <TextField name="phone" label="Teléfono" required type="tel" defaultValue={initial?.phone} hint="Con código de área, por ejemplo 11 5555-1234." autoComplete="off" />
-        <TextField name="email" label="Email" type="email" defaultValue={initial?.email} hint="Para enviarle la confirmación y los recordatorios." autoComplete="off" />
+        <TextField name="email" label="Email" type="email" defaultValue={initial?.email} hint="Opcional. Sirve para que el paciente pueda buscar su turno con su email." autoComplete="off" />
       </div>
       {!readOnly ? (
         <FormActions>

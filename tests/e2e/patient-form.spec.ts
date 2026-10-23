@@ -59,6 +59,33 @@ test.describe("patient: booking with the form", () => {
     await expect(page.getByRole("button", { name: "Cancelar turno" })).toHaveCount(0);
   });
 
+  test("the next free slot shortcut goes straight to confirmation, and the link can be saved", async ({ page, context }) => {
+    await context.grantPermissions(["clipboard-read", "clipboard-write"]);
+    await page.goto("/reservar?clinica=aromos");
+    await page.getByRole("link", { name: /^Nutrición/ }).click();
+    await page.getByRole("link", { name: /^Seguimiento/ }).click();
+
+    const shortcut = page.getByRole("link", { name: /El próximo turno libre/ });
+    await expect(shortcut).toBeVisible();
+    const time = (await shortcut.textContent())!.match(/(\d{2}:\d{2}) h/)![1];
+    await shortcut.click();
+    await expect(page.getByRole("heading", { name: "Revisá y confirmá tu turno" })).toBeVisible();
+    await expect(page.getByText(time, { exact: true })).toBeVisible();
+
+    await page.getByLabel("Nombre y apellido").fill("Nora Atajo");
+    await page.getByLabel("Teléfono celular").fill("11 6300-4455");
+    await page.getByLabel("Email", { exact: true }).fill("nora.atajo@example.com");
+    await page.getByRole("checkbox").check();
+    await page.getByRole("button", { name: "Confirmar turno" }).click();
+
+    await expect(page.getByRole("heading", { name: "Guardá este enlace" })).toBeVisible();
+    await page.getByRole("button", { name: "Copiar enlace" }).click();
+    await expect(page.getByRole("button", { name: "¡Copiado!" })).toBeVisible();
+    const copied = await page.evaluate(() => navigator.clipboard.readText());
+    expect(copied).toMatch(/\/turno\/T-[2-9A-Z]{6}\?t=/);
+    expect(copied).not.toContain("nuevo=1");
+  });
+
   test("a bad link does not reveal anything", async ({ page }) => {
     const { soon } = fixtures();
     await page.goto(`/turno/${soon.code}?t=not-the-token`);

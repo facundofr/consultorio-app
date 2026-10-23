@@ -2,6 +2,9 @@
 @import "tw-animate-css";
 @import "@fontsource-variable/atkinson-hyperlegible-next";
 
+/* Dark mode follows the .dark class on <html> (set before paint by the theme script). */
+@custom-variant dark (&:where(.dark, .dark *));
+
 /*
  * Turnos IA design tokens.
  * Eucalyptus green on a cool mineral white; Atkinson Hyperlegible Next for
@@ -21,6 +24,12 @@
   --gris: #56656c;
   --alerta: #a8321f;
   --alerta-claro: #fbe9e5;
+  /* Text on the yellow "sol" highlight: always dark ink, in both themes. */
+  --sol-foreground: #17262e;
+  --destructive-foreground: #ffffff;
+  --overlay: rgb(23 38 46 / 0.45);
+  --shadow-color: 23 38 46;
+  --chart-3: #9aa8ad;
 
   --background: var(--papel);
   --foreground: var(--tinta);
@@ -43,6 +52,40 @@
   --radius: 0.625rem;
 }
 
+/*
+ * Dark theme: eucalyptus on graphite. Same roles, re-tuned for contrast
+ * (WCAG AA for text on every surface); "sol" keeps its warm accent.
+ */
+.dark {
+  color-scheme: dark;
+  --tinta: #e3ebe9;
+  --papel: #0d1315;
+  --eucalipto: #55b8a8;
+  --eucalipto-oscuro: #86d3c6;
+  --eucalipto-claro: #16302d;
+  --sol: #f2bb3d;
+  --sol-claro: #34290f;
+  --linea: #263235;
+  --gris: #9babab;
+  --alerta: #ee7a64;
+  --alerta-claro: #361a15;
+  --sol-foreground: #17262e;
+  --destructive-foreground: #2a0b06;
+  --overlay: rgb(0 0 0 / 0.6);
+  --shadow-color: 0 0 0;
+  --chart-3: #5d6c71;
+
+  --card: #141c1f;
+  --card-foreground: var(--tinta);
+  --popover: #182225;
+  --popover-foreground: var(--tinta);
+  --primary-foreground: #04201c;
+  --secondary-foreground: #a9e0d6;
+  --muted: #1b2528;
+  --accent-foreground: #a9e0d6;
+  --input: #3a4a4d;
+}
+
 @theme inline {
   --font-sans: "Atkinson Hyperlegible Next Variable", system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
   --color-background: var(--background);
@@ -60,12 +103,16 @@
   --color-accent: var(--accent);
   --color-accent-foreground: var(--accent-foreground);
   --color-destructive: var(--destructive);
+  --color-destructive-foreground: var(--destructive-foreground);
   --color-border: var(--border);
   --color-input: var(--input);
   --color-ring: var(--ring);
   --color-tinta: var(--tinta);
   --color-sol: var(--sol);
   --color-sol-claro: var(--sol-claro);
+  --color-sol-foreground: var(--sol-foreground);
+  --color-overlay: var(--overlay);
+  --color-chart-3: var(--chart-3);
   --color-alerta-claro: var(--alerta-claro);
   --color-eucalipto-oscuro: var(--eucalipto-oscuro);
   --radius-sm: calc(var(--radius) - 4px);
@@ -83,6 +130,7 @@
   }
   body {
     @apply bg-background text-foreground font-sans;
+    transition: background-color 0.2s ease, color 0.2s ease;
     font-size: 1rem;
     line-height: 1.5;
   }
