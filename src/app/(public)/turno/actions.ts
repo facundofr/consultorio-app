@@ -24,8 +24,8 @@ function factorFrom(contact: string): SecondFactor {
 
 async function limited(code: string | null) {
   const ip = await clientIpHash();
-  const a = rateLimit(`lookup:ip:${ip}`, 15, 15 * 60_000);
-  const b = code ? rateLimit(`lookup:code:${code}`, 8, 60 * 60_000) : { ok: true };
+  const a = await rateLimit(`lookup:ip:${ip}`, 15, 15 * 60_000);
+  const b = code ? await rateLimit(`lookup:code:${code}`, 8, 60 * 60_000) : { ok: true };
   return !a.ok || !b.ok;
 }
 

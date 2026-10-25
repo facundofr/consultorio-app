@@ -273,6 +273,14 @@ describe("admin appointment operations", () => {
     const csv = await exportAppointmentsCsv(db, admin, f.clinic.id, {});
     expect(csv).toContain(";'=CMD Evil;");
   });
+
+  it("front desk cannot export, and the audit log never keeps the search text", async () => {
+    await expect(exportAppointmentsCsv(db, staff, f.clinic.id, {})).rejects.toMatchObject({ code: "FORBIDDEN" });
+    await exportAppointmentsCsv(db, admin, f.clinic.id, { q: "1155551001" });
+    const [entry] = await db.select().from(auditLog).where(eq(auditLog.action, "export"));
+    expect(JSON.stringify(entry.data)).not.toContain("1155551001");
+    expect(entry.data).toMatchObject({ filters: { search: true } });
+  });
 });
 
 describe("patients search", () => {

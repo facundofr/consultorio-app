@@ -58,7 +58,9 @@ export default async function PanelLayout({ children }: LayoutProps<"/admin">) {
         ...(actor.role === "superadmin" ? [{ href: "/admin/clinicas", label: "Clínicas", icon: "building" as const }] : []),
         ...(can(actor, "read", "users") ? [{ href: "/admin/usuarios", label: "Usuarios", icon: "usercog" as const }] : []),
         ...(can(actor, "read", "conversations") ? [{ href: "/admin/conversaciones", label: "Conversaciones", icon: "chat" as const }] : []),
+        ...(can(actor, "read", "emails") ? [{ href: "/admin/emails", label: "Emails", icon: "mail" as const }] : []),
         ...(can(actor, "read", "audit") ? [{ href: "/admin/auditoria", label: "Auditoría", icon: "history" as const }] : []),
+        { href: "/admin/seguridad", label: "Mi cuenta y seguridad", icon: "shield" as const },
       ],
     },
   ];

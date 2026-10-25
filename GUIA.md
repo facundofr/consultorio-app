@@ -124,11 +124,13 @@ Reglas de las cuentas del panel:
 
 - **No hay registro público**: los usuarios los crea un administrador desde **Usuarios**.
 - **Contraseña**: mínimo 10 caracteres, guardada con argon2.
-- **Intentos de ingreso**: como máximo 5 por email y 20 por IP cada 15 minutos.
+- **Intentos de ingreso**: como máximo 5 por email y 20 por IP cada 15 minutos. Los intentos fallidos quedan en auditoría.
+- **Doble factor** (app de autenticación con códigos de 6 números, más 10 códigos de respaldo de un solo uso): cada persona lo activa en **Mi cuenta y seguridad**. Con `TWO_FACTOR_REQUIRED_ROLES` (por ejemplo `superadmin,clinic_admin`) es obligatorio para esos roles: hasta configurarlo no pueden usar el panel. Si alguien pierde el celular y los códigos, administración se lo quita desde su ficha en **Usuarios**.
 - **Sesión**: dura 12 horas.
 - **Cambios con efecto inmediato**: cambiar la contraseña, el rol o la clínica de alguien, o desactivarlo, **cierra todas sus sesiones abiertas**.
 - **Límites sobre uno mismo**: nadie puede bajarse el rol ni desactivarse a sí mismo.
-- No hay "olvidé mi contraseña": la cambia un administrador.
+- **Cambiar la propia contraseña**: en **Mi cuenta y seguridad**, con la contraseña actual. Cierra las otras sesiones abiertas.
+- No hay "olvidé mi contraseña" por email: la cambia un administrador, o `pnpm create-admin` desde el servidor.
 
 ### Qué puede hacer cada rol
 
@@ -142,6 +144,8 @@ Reglas de las cuentas del panel:
 | Ajustes de la clínica | ✔ | ✔ | solo ver |
 | Usuarios | ✔ (todos los roles) | ✔ (administración y recepción de su clínica) | ✘ |
 | Conversaciones del asistente | ✔ | ✔ | ✘ |
+| Emails a pacientes (estado, bandeja de prueba, reintentar) | ✔ | ✔ | ✘ |
+| Exportar CSV con datos de pacientes | ✔ | ✔ | ✘ |
 | Auditoría | ✔ | ✔ | ✘ |
 | Clínicas (crear, editar, dar de baja) | ✔ | ✘ | ✘ |
 | Ver otras clínicas | ✔ (con un selector) | ✘ | ✘ |
@@ -230,7 +234,7 @@ Detalles:
 
 ### Página del turno (`/turno/T-XXXXXX?t=…`)
 
-Es el enlace secreto que aparece al confirmar. Recién reservado, muestra arriba el recuadro **«Guardá este enlace»**, con los botones **Copiar enlace** y **Enviármelo por WhatsApp**: hasta que existan los emails, es la única copia del paciente. Además muestra:
+Es el enlace secreto que aparece al confirmar y que también llega en el **email de confirmación**. Recién reservado, muestra arriba el recuadro **«Guardá este enlace»**, con los botones **Copiar enlace** y **Enviármelo por WhatsApp**. Además muestra:
 
 - Día, hora, profesional, especialidad, tipo de consulta, sede con dirección e indicaciones, teléfono de la clínica y código.
 - **«Agregar al calendario»**: un archivo `.ics` que sirve para Google Calendar, Apple y Outlook, con una alarma 2 horas antes.
@@ -374,7 +378,7 @@ Se entra por `/admin/login`.
 ### Turnos
 
 - Listado con filtros: fechas, profesional, sede, estado, origen y código o paciente.
-- **Exportar CSV**: separado por `;`, con caracteres especiales listos para Excel en español y protegido contra fórmulas maliciosas. Incluye teléfono y email descifrados. **Cada exportación queda en auditoría.**
+- **Exportar CSV** (solo administración): separado por `;`, con caracteres especiales listos para Excel en español y protegido contra fórmulas maliciosas. Incluye teléfono y email descifrados. **Cada exportación queda en auditoría.**
 - **Ficha del turno**: datos completos, origen y conversación del asistente si la hubo. También muestra el **historial**: creado, movido, cancelado y cambios de estado, con quién lo hizo.
 - **Estados**:
   - Confirmado, Atendido y Ausente se pueden alternar entre sí.
@@ -446,6 +450,26 @@ Crear y editar usuarios: nombre, email, rol, clínica, contraseña y activo o in
   - el turno resultante;
   - cada llamada al modelo, con proveedor, modelo, tokens, demora y error si lo hubo.
 - **Abrir una conversación queda en auditoría.**
+
+### Emails (Administración y Superadmin)
+
+La app le escribe sola al paciente (si dejó email):
+
+| Email | Cuándo |
+|---|---|
+| **Turno confirmado** | Al reservar, por formulario, chat o panel. Trae el enlace para ver o cancelar y el archivo `.ics` |
+| **Turno cancelado** | Si cancela el paciente o la clínica. Ofrece «Sacar otro turno» |
+| **Tu turno cambió** | Si la clínica lo mueve. Muestra el horario anterior tachado |
+| **Recordatorio** | Las horas antes que diga **Ajustes**. No se manda si el turno se sacó dentro de ese plazo |
+
+- Se encolan en la misma transacción que el turno y los envía una tarea en segundo plano cada minuto. Si el proveedor falla se reintenta (1 min, 5 min, 30 min, 2 h, 6 h) y después queda como «Falló», con un botón para reintentar.
+- **Sin SMTP configurado no sale nada**: los emails quedan en la **bandeja de prueba** de esta pantalla, con la vista previa tal como la vería el paciente.
+- El contenido se guarda cifrado y **se borra apenas se envía** (los de prueba, a los 7 días). Abrir uno queda en auditoría.
+- Si las tareas automáticas se frenan, la pantalla lo avisa.
+
+### Mi cuenta y seguridad (todos)
+
+Activar o desactivar el doble factor, generar nuevos códigos de respaldo y cambiar la contraseña.
 
 ### Auditoría
 
@@ -536,6 +560,9 @@ La regla es: **se puede cancelar online si ahora ≤ inicio del turno − horas 
 | Consentimiento | Casilla obligatoria al reservar online. Se guarda la fecha y la versión del texto aceptado. Los pacientes que carga el equipo quedan como «Cargado por el equipo». |
 | Asistente de IA | El modelo nunca recibe nombre, teléfono ni email. Lo que se escriba con esa forma se reemplaza antes de guardar y de enviar. Las conversaciones se borran a los 30 días. |
 | Contraseñas del equipo | argon2, mínimo 10 caracteres, límite de intentos. |
+| Doble factor | TOTP (RFC 6238) con el secreto cifrado y códigos de respaldo guardados como HMAC. Un código no se acepta dos veces. Obligatorio por rol con `TWO_FACTOR_REQUIRED_ROLES`. |
+| Emails | Cola en la base con el contenido cifrado, que se borra al enviarse. Los errores del proveedor se guardan sin la dirección. |
+| Cabeceras | CSP con *nonce* por pedido, `frame-ancestors 'none'`, `nosniff`, `Referrer-Policy`, `Permissions-Policy` y HSTS con HTTPS. |
 | Sesiones | En base de datos, revocables, 12 horas. |
 | Permisos | Controlados en cada función del servidor, por rol y por clínica. |
 | Auditoría | Registra ids y nombres de campos, nunca valores personales. |
@@ -550,7 +577,7 @@ Límites de intentos:
 | Buscar o cancelar un turno | 15 por IP cada 15 minutos y 8 por código por hora |
 | Mensajes al asistente | 30 por IP cada 10 minutos, y 10 conversaciones nuevas por IP por hora |
 
-Los límites se guardan en memoria: valen para **una sola instancia** de la app. Con varias instancias habría que llevarlos a Postgres o Redis.
+Los límites se guardan **en PostgreSQL** (tabla `rate_limits`, con la clave como HMAC): sobreviven a los reinicios y valen con varias instancias. La IP es la que escribe el proxy propio (`CLIENT_IP_HEADER` y `TRUSTED_PROXY_HOPS`), no la que manda el visitante.
 
 ---
 
@@ -576,6 +603,18 @@ Todas están en [`.env.example`](./.env.example).
 | `SEED_ADMIN_PASSWORD` | (al azar) | Contraseña de los usuarios de demo. |
 | `SEED_ALLOW_PRODUCTION` | `false` | El seed se niega a correr en producción salvo con `true`. |
 | `DATABASE_POOL_MAX` | `10` | Conexiones simultáneas a la base. |
+| `CLIENT_IP_HEADER` / `TRUSTED_PROXY_HOPS` | `x-forwarded-for` / `1` | De dónde sale la IP real del visitante (ver `.env.example`). |
+| `TWO_FACTOR_REQUIRED_ROLES` | vacío | Roles con doble factor obligatorio, por ejemplo `superadmin,clinic_admin`. |
+| `JOBS_ENABLED` | `true` | Tareas en segundo plano dentro de la app (emails, recordatorios, limpieza). `false` si corren por cron con `pnpm jobs`. |
+| `ERROR_WEBHOOK_URL` | vacío | Recibe cada error del servidor como JSON (Slack, Discord, colector de logs). |
+
+### Email (SMTP)
+
+| Variable | Para qué |
+|---|---|
+| `SMTP_HOST`, `SMTP_PORT`, `SMTP_SECURE` | Servidor de envío. **Vacío = bandeja de prueba**: no sale nada. |
+| `SMTP_USER`, `SMTP_PASS` | Credenciales del proveedor. |
+| `MAIL_FROM` | Remitente, por ejemplo `"Centro Médico <turnos@miclinica.com.ar>"`. |
 
 ### Asistente de IA (todas opcionales)
 
@@ -591,7 +630,7 @@ Todas están en [`.env.example`](./.env.example).
 | `LLM_CONVERSATION_MESSAGE_LIMIT` | `40` | Mensajes del paciente por conversación. |
 | `LLM_TIMEOUT_MS` | `20000` | Espera máxima por proveedor antes de pasar al siguiente. |
 | `LLM_MAX_TOOL_ROUNDS` | `4` | Llamadas al modelo por mensaje. |
-| `CHAT_RETENTION_DAYS` | `30` | Días hasta borrar una conversación. Si se cambia, hay que actualizar `/privacidad`. |
+| `CHAT_RETENTION_DAYS` | `30` | Días hasta borrar una conversación. `/privacidad` muestra el mismo valor. |
 | `LLM_MOCK` | vacío | `1` = modelo simulado local, sin claves. |
 
 ---
@@ -600,10 +639,10 @@ Todas están en [`.env.example`](./.env.example).
 
 | Comando | Qué prueba |
 |---|---|
-| `pnpm test` | Todos los unitarios y de integración (198 tests). |
+| `pnpm test` | Todos los unitarios y de integración (250 tests). |
 | `pnpm test:unit` | Lógica pura: motor de horarios, zonas horarias, cifrado, archivo `.ics`, permisos, límites, regla de cancelación, redacción de datos, detector de urgencias y respaldo entre proveedores de IA. |
 | `pnpm test:integration` | Contra **PostgreSQL real** en una base temporal: reservas, concurrencia (12 reservas simultáneas del mismo horario y gana una sola), cancelación en el límite exacto, permisos del panel por rol y clínica, el seed y el asistente completo (búsqueda, reserva, horarios inventados, límites, urgencias, retención). |
-| `pnpm test:e2e` | Playwright contra el **build de producción** con una base temporal (22 tests, incluidos los de celular a 390×844): reserva por formulario y por chat, cancelación por enlace y por código, bloqueo dentro de las 24 h, urgencias en el chat, agenda del panel, profesionales, bloqueos y conversaciones. `--rebuild` fuerza un `next build` nuevo. |
+| `pnpm test:e2e` | Playwright contra el **build de producción** con una base temporal (incluidos los de celular a 390×844): reserva por formulario y por chat, cancelación por enlace y por código, bloqueo dentro de las 24 h, urgencias en el chat, agenda del panel, profesionales, bloqueos, conversaciones, doble factor de punta a punta, bandeja de emails, permisos de recepción y cabeceras de seguridad (CSP sin bloqueos). `--rebuild` fuerza un `next build` nuevo. |
 | `pnpm typecheck` / `pnpm lint` | Tipos y estilo. |
 
 Los tests levantan su propio Postgres y **no tocan la base de desarrollo**. Antes del primer E2E hay que instalar el navegador: `pnpm exec playwright install chromium`.
@@ -614,11 +653,8 @@ Los tests levantan su propio Postgres y **no tocan la base de desarrollo**. Ante
 
 Pendiente para los próximos hitos:
 
-- **No se envía ningún email todavía**: ni confirmación ni recordatorio. Los textos ya no lo prometen. El ajuste «Recordatorio (horas antes)» se guarda para cuando exista el envío. Mientras tanto, la confirmación ofrece **copiar el enlace o mandárselo por WhatsApp**, y si se pierde queda **Mi turno** con el código. `docker-compose.dev.yml` ya trae Mailpit (puerto 8025) para cuando se implemente.
-- **Avisos al paciente cuando la clínica cancela o mueve su turno**: el equipo tiene que avisarle por teléfono.
-- **Despliegue a producción**: no hay `Dockerfile` ni compose de producción. La app ya se construye en modo `standalone` y espera estar detrás de un proxy (nginx) que pase la IP real del visitante.
-- **Recuperar contraseña del panel por email**.
-- **Varias instancias**: los límites de intentos viven en memoria (ver sección 9).
+- **Recuperar la contraseña del panel por email** (hoy la cambia un administrador o `pnpm create-admin`).
+- **WhatsApp o SMS** al paciente: por ahora solo email.
 - **Asistente**:
   - no conserva la conversación al recargar la página;
   - las respuestas llegan completas, no palabra por palabra.
@@ -648,6 +684,9 @@ Todas las rutas del panel requieren sesión.
 | Ruta | Qué es |
 |---|---|
 | `/admin/login` | Ingreso |
+| `/admin/login/verificar` | Código del doble factor |
+| `/admin/seguridad` | Mi cuenta y seguridad |
+| `/admin/emails`, `/admin/emails/[id]` | Emails a pacientes y vista previa |
 | `/admin` | Inicio (dashboard) |
 | `/admin/agenda` | Agenda |
 | `/admin/turnos`, `/admin/turnos/[id]` | Turnos y ficha |

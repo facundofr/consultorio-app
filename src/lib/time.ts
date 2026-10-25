@@ -137,3 +137,11 @@ export function formatTime(instant: Date, tz: string): string {
 export function formatDateTime(instant: Date, tz: string): string {
   return `${formatLongDate(instant, tz)}, ${formatTime(instant, tz)} h`;
 }
+
+/** "jue 5/11, 14:30 h" — compact, for email subjects. */
+export function formatShortDateTime(instant: Date, tz: string): string {
+  const wd = formatter(tz, { weekday: "short" }).format(instant).replace(".", "");
+  const l = utcToLocal(instant, tz);
+  const [, m, d] = l.date.split("-");
+  return `${wd} ${Number(d)}/${Number(m)}, ${l.time} h`;
+}

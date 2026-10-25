@@ -34,7 +34,7 @@ export function decrypt(payload: string): string {
   return Buffer.concat([decipher.update(Buffer.from(ct, "base64url")), decipher.final()]).toString("utf8");
 }
 
-export function blindIndex(kind: "phone" | "email" | "ip", normalized: string): string {
+export function blindIndex(kind: "phone" | "email" | "ip" | "ratelimit" | "backup", normalized: string): string {
   return createHmac("sha256", key("PII_HASH_KEY")).update(`${kind}:${normalized}`).digest("base64url");
 }
 

@@ -184,6 +184,7 @@ export type SlotQuery = z.input<typeof SlotQuery>;
 export async function findSlots(db: Db, raw: SlotQuery, now: Date = new Date()): Promise<{ timezone: string; slots: PublicSlot[] }> {
   const q = SlotQuery.parse(raw);
   const { clinic, settings: st } = await getClinicContext(db, q.clinicId);
+  if (!clinic.active) throw new DomainError("NOT_FOUND", "No encontramos esa clínica.");
   const tz = clinic.timezone;
   const today = utcToLocal(now, tz).date;
   const fromDate = q.fromDate && q.fromDate > today ? q.fromDate : today;

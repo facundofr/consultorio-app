@@ -42,7 +42,7 @@ export async function bookAction(
   if (!values.consent) fieldErrors.consent = "Para reservar necesitamos que aceptes el uso de tus datos.";
   if (Object.keys(fieldErrors).length) return { error: "Revisá los datos marcados.", fieldErrors, values, seq: Date.now() };
 
-  const limit = rateLimit(`book:${await clientIpHash()}`, 10, 60 * 60_000);
+  const limit = await rateLimit(`book:${await clientIpHash()}`, 10, 60 * 60_000);
   if (!limit.ok) return { error: "Hiciste muchas reservas seguidas. Probá de nuevo en un rato o llamá a la clínica.", values, seq: Date.now() };
 
   let target: string | null = null;

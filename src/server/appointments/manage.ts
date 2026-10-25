@@ -4,6 +4,7 @@ import type { Db, Tx } from "@/db/client";
 import { appointmentEvents, appointments, type AppointmentStatus } from "@/db/schema";
 import { getAvailableSlots, loadBookingContext } from "@/server/availability/service";
 import { getClinicContext } from "@/server/clinics/settings";
+import { enqueueAppointmentEmail } from "@/server/email/outbox";
 import { DomainError, PG_EXCLUSION_VIOLATION, pgErrorCode } from "@/server/errors";
 import { lockProfessionalAgenda } from "./lock";
 
@@ -86,6 +87,7 @@ export async function cancelAppointment(db: Db, appointmentId: string, by: Cance
       actorUserId: by.kind === "admin" ? by.userId : null,
       data: by.kind === "patient" ? { channel: by.channel } : { reason: by.reason ?? null },
     });
+    await enqueueAppointmentEmail(tx, appointmentId, "cancellation", { cancelledBy: by.kind === "patient" ? "patient" : "clinic", now });
     return row;
   });
 }
@@ -159,6 +161,7 @@ export async function rescheduleAppointment(
           forced: !!input.force,
         },
       });
+      await enqueueAppointmentEmail(tx, appt.id, "rescheduled", { previousStartsAt: appt.startsAt, now });
       return row;
     });
   } catch (e) {

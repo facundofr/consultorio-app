@@ -2,7 +2,7 @@
 
 Reserva de turnos médicos online: el paciente conversa con un asistente de IA (o usa un formulario) y el equipo de la clínica gestiona todo desde `/admin`.
 
-> Estado: **hito 4 de 6**. Están listos el esquema, el seed, el motor de disponibilidad, el panel de administración, la reserva por formulario, la cancelación y el **asistente de IA**. Ver [`DECISIONS.md`](./DECISIONS.md). Guía completa de funcionalidades: [`GUIA.md`](./GUIA.md). Lo que falta: [`PENDIENTES.md`](./PENDIENTES.md).
+> Estado: **lista para producción**. Incluye: reserva por formulario y por asistente de IA, cancelación, panel de administración, **emails** (confirmación, cancelación, cambios y recordatorios), **doble factor** en el panel, tareas automáticas y **despliegue con Docker** (HTTPS y backups). Cómo instalarla en un servidor: [`deploy/README.md`](./deploy/README.md). Ver [`DECISIONS.md`](./DECISIONS.md). Guía completa de funcionalidades: [`GUIA.md`](./GUIA.md). Lo que falta: [`PENDIENTES.md`](./PENDIENTES.md).
 
 ## Requisitos
 
@@ -64,10 +64,17 @@ El paciente escribe («quiero un turno con cardiología el martes a la mañana»
 
 Para sacar una clave gratis: [console.groq.com](https://console.groq.com/keys), [aistudio.google.com](https://aistudio.google.com/apikey) u [openrouter.ai](https://openrouter.ai/keys). Los nombres de modelos cambian seguido: si un proveedor devuelve error 404, revisá `GROQ_MODEL`, `GEMINI_MODEL` u `OPENROUTER_MODEL`. El panel muestra el error de cada llamada.
 
+## Emails al paciente
+
+Confirmación (con el enlace para ver o cancelar y el `.ics`), cancelación, cambio de horario y recordatorio N horas antes (según **Ajustes**). Se encolan en la misma transacción que el turno y una tarea en segundo plano los envía por SMTP, con reintentos. El contenido se guarda cifrado y se borra al enviarse.
+
+- **Sin `SMTP_HOST`, no sale nada**: los emails quedan en **Panel → Emails** (bandeja de prueba con vista previa). En desarrollo podés usar Mailpit (`docker compose -f docker-compose.dev.yml up -d`, `SMTP_HOST=127.0.0.1`, `SMTP_PORT=1025`, http://localhost:8025).
+- Las tareas (envíos cada minuto, recordatorios cada 5, limpieza cada hora) corren dentro de la app. Con `JOBS_ENABLED=false` se pueden correr por cron con `pnpm jobs`.
+
 ## Panel de administración (`/admin`)
 
 - **Agenda** por día o semana, por sede o por profesional. Tocá un hueco libre para agendar: buscás o creás al paciente y elegís uno de los horarios reales. Tocá un turno para moverlo o cancelarlo. Administración puede dar sobreturnos fuera de la grilla, pero nunca superpuestos.
-- **Turnos**: listado con filtros (fechas, profesional, sede, estado, origen, código o paciente) y exportación CSV. Cada turno tiene su ficha con historial.
+- **Turnos**: listado con filtros (fechas, profesional, sede, estado, origen, código o paciente) y exportación CSV (solo administración). Cada turno tiene su ficha con historial.
 - **Pacientes**: búsqueda por nombre, o por teléfono, email o código completos (están cifrados).
 - **Profesionales y horarios**: datos, especialidades, sedes, grilla semanal con vigencias, vacaciones y horarios extra.
 - **Feriados y bloqueos**: de toda la clínica, de una sede o de un profesional. Al cargarlos avisa si hay turnos confirmados afectados.
@@ -75,6 +82,8 @@ Para sacar una clave gratis: [console.groq.com](https://console.groq.com/keys), 
 - **Ajustes** por clínica: horas para cancelar (24 por defecto), grilla, horizonte, anticipación, recordatorio, textos del asistente, contacto y mensajes.
 - **Conversaciones del asistente** (administración): listado por fecha y estado (reservó, posible urgencia, límite de uso, sin terminar) y ficha con la transcripción, las herramientas que usó, el turno resultante y cada llamada al modelo con proveedor, tokens, demora y errores. Abrir una transcripción queda en auditoría. Se borran solas a los `CHAT_RETENTION_DAYS` días (30 por defecto, lo que dice la política de privacidad).
 - **Usuarios** y roles, **auditoría** de acciones del equipo y **dashboard** (turnos del día, ocupación, cancelaciones, origen de las reservas y uso del LLM).
+- **Emails** (administración): estado de cada envío, reintentos, bandeja de prueba con vista previa.
+- **Mi cuenta y seguridad** (todos): doble factor con app de autenticación y códigos de respaldo, y cambio de contraseña. Con `TWO_FACTOR_REQUIRED_ROLES=superadmin,clinic_admin` es obligatorio para esos roles.
 
 ## Scripts
 
@@ -89,8 +98,14 @@ Para sacar una clave gratis: [console.groq.com](https://console.groq.com/keys), 
 | `pnpm db:migrate` | Aplica migraciones |
 | `pnpm seed` / `pnpm seed --reset` | Carga datos de demo (con `--reset` vacía la base antes) |
 | `pnpm db:embedded` | Postgres 17 local sin Docker |
+| `pnpm jobs` | Corre una vez las tareas en segundo plano (para cron) |
+| `pnpm create-admin --email … --name "…"` | Crea un usuario del panel (superadmin por defecto) o le cambia la contraseña. Para el primer usuario en producción |
 
 Los tests de integración y E2E levantan su propio Postgres y no tocan tu base. Antes del primer `pnpm test:e2e` instalá el navegador: `pnpm exec playwright install chromium`.
+
+## Producción
+
+`Dockerfile` + `docker-compose.prod.yml`: PostgreSQL, migraciones automáticas, la app, Caddy con HTTPS automático y backup diario. Guía paso a paso, restauración de backups y checklist de seguridad: [`deploy/README.md`](./deploy/README.md).
 
 ## Estructura
 

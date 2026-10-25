@@ -152,7 +152,7 @@ function csvCell(v: unknown): string {
 
 /** CSV (semicolon separated, UTF-8 BOM: opens correctly in Excel es-AR). */
 export async function exportAppointmentsCsv(db: Db, actor: Actor, clinicId: string, filters: AppointmentFilters) {
-  assertCan(actor, "read", "appointments", clinicId);
+  assertCan(actor, "read", "exports", clinicId);
   const { where, tz } = await buildWhere(db, clinicId, filters);
   const data = await db
     .select({
@@ -203,7 +203,7 @@ export async function exportAppointmentsCsv(db: Db, actor: Actor, clinicId: stri
       .map(csvCell)
       .join(";");
   });
-  await audit(db, actor, { action: "export", entity: "appointments", clinicId, data: { rows: data.length, filters: AppointmentFilters.parse(filters) } });
+  await audit(db, actor, { action: "export", entity: "appointments", clinicId, data: { rows: data.length, filters: auditableFilters(filters) } });
   return "﻿" + [header.join(";"), ...lines].join("\r\n") + "\r\n";
 }
 
@@ -233,6 +233,15 @@ export async function getAppointmentDetail(db: Db, actor: Actor, id: string) {
     patientEmail: p.emailEnc ? decrypt(p.emailEnc) : null,
     events,
   };
+}
+
+/**
+ * Export filters for the audit log: ids and dates only. The free-text search
+ * can hold a patient's name, phone or email, so only its presence is logged.
+ */
+function auditableFilters(raw: AppointmentFilters) {
+  const { q, ...rest } = AppointmentFilters.parse(raw);
+  return { ...rest, search: !!q };
 }
 
 /* ------------------------------ Admin actions ----------------------------- */

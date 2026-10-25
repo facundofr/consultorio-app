@@ -9,6 +9,9 @@ export type Actor = {
   role: UserRole;
   /** null only for superadmin */
   clinicId: string | null;
+  /** Set for signed-in panel users (not in service-level tests). */
+  twoFactorEnabled?: boolean;
+  sessionId?: string;
 };
 
 export type Resource =
@@ -22,7 +25,9 @@ export type Resource =
   | "users"
   | "audit"
   | "conversations"
-  | "dashboard";
+  | "dashboard"
+  | "exports" // bulk downloads with decrypted contact data (CSV)
+  | "emails"; // outbox: delivery status, test inbox, retries
 
 export type Action = "read" | "write" | "delete";
 
@@ -35,15 +40,16 @@ const R: Action[] = ["read"];
  * - superadmin: everything, every clinic.
  * - clinic_admin: everything inside their clinic (no creating clinics, no superadmins).
  * - staff: front desk — agenda, appointments and patients; read-only catalog.
+ *   No bulk exports: the CSV carries every patient's phone and email in clear.
  */
 export const PERMISSIONS: Record<UserRole, Partial<Record<Resource, Action[]>>> = {
   superadmin: {
     clinics: ALL, settings: ALL, catalog: ALL, professionals: ALL, schedules: ALL, patients: ALL,
-    appointments: ALL, users: ALL, audit: ALL, conversations: ALL, dashboard: ALL,
+    appointments: ALL, users: ALL, audit: ALL, conversations: ALL, dashboard: ALL, exports: R, emails: RW,
   },
   clinic_admin: {
     clinics: RW, settings: RW, catalog: ALL, professionals: ALL, schedules: ALL, patients: ALL,
-    appointments: RW, users: ALL, audit: R, conversations: R, dashboard: R,
+    appointments: RW, users: ALL, audit: R, conversations: R, dashboard: R, exports: R, emails: RW,
   },
   staff: {
     clinics: R, settings: R, catalog: R, professionals: R, schedules: R, patients: RW,

@@ -24,12 +24,12 @@ const str = (v: unknown, max: number) => (typeof v === "string" ? v.slice(0, max
 /** Send a message. Without a session, the conversation starts here (lazily). */
 export async function sendChatAction(clinicSlug: string, session: ChatSession | null, text: string): Promise<ChatResponse> {
   const ip = await clientIpHash();
-  if (!rateLimit(`chat:msg:${ip}`, 30, 10 * 60_000).ok) return { ok: false, error: BUSY };
+  if (!(await rateLimit(`chat:msg:${ip}`, 30, 10 * 60_000)).ok) return { ok: false, error: BUSY };
   const db = getDb();
   try {
     let s = session && typeof session.conversationId === "string" ? { conversationId: str(session.conversationId, 40), secret: str(session.secret, 100) } : null;
     if (!s) {
-      if (!rateLimit(`chat:new:${ip}`, 10, 60 * 60_000).ok) return { ok: false, error: BUSY };
+      if (!(await rateLimit(`chat:new:${ip}`, 10, 60 * 60_000)).ok) return { ok: false, error: BUSY };
       const started = await startConversation(db, str(clinicSlug, 100), ip);
       s = { conversationId: started.conversationId, secret: started.secret };
     }
@@ -42,7 +42,7 @@ export async function sendChatAction(clinicSlug: string, session: ChatSession | 
 
 export async function pickSlotAction(session: ChatSession, ref: string): Promise<ChatResponse> {
   const ip = await clientIpHash();
-  if (!rateLimit(`chat:msg:${ip}`, 30, 10 * 60_000).ok) return { ok: false, error: BUSY };
+  if (!(await rateLimit(`chat:msg:${ip}`, 30, 10 * 60_000)).ok) return { ok: false, error: BUSY };
   try {
     const s = { conversationId: str(session?.conversationId, 40), secret: str(session?.secret, 100) };
     const r = await pickSlot(getDb(), { ...s, ref: str(ref, 10) });
@@ -71,7 +71,7 @@ export async function confirmChatBookingAction(session: ChatSession, ref: string
   const seq = Date.now();
   // Honeypot: real people never fill this hidden field.
   if (String(fd.get("website") ?? "")) return { error: "No pudimos procesar la reserva.", values, seq };
-  if (!rateLimit(`book:${await clientIpHash()}`, 10, 60 * 60_000).ok) {
+  if (!(await rateLimit(`book:${await clientIpHash()}`, 10, 60 * 60_000)).ok) {
     return { error: "Hiciste muchas reservas seguidas. Probá de nuevo en un rato o llamá a la clínica.", values, seq };
   }
   try {

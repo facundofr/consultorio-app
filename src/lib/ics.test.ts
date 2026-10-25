@@ -26,8 +26,8 @@ describe("ics", () => {
   });
 
   it("escapes text", () => {
-    expect(escapeText("a,b;c\\d\ne")).toBe("a\\,b\;c\\\\d\\ne");
-    expect(ics.replace(/\r\n /g, "")).toContain("DESCRIPTION:Código T-8KQ4ZP\\nTraé tu DNI\; llegá 10 min antes\\, gracias");
+    expect(escapeText("a,b;c\\d\ne")).toBe("a\\,b\\;c\\\\d\\ne");
+    expect(ics.replace(/\r\n /g, "")).toContain("DESCRIPTION:Código T-8KQ4ZP\\nTraé tu DNI\\; llegá 10 min antes\\, gracias");
   });
 
   it("folds long lines without breaking multi-byte characters", () => {

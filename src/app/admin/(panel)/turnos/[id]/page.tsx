@@ -20,7 +20,7 @@ const EVENT_LABELS: Record<string, string> = {
   cancelled: "Turno cancelado",
   rescheduled: "Turno movido",
   status_changed: "Cambio de estado",
-  reminder_sent: "Recordatorio enviado",
+  reminder_sent: "Recordatorio en cola",
   email_sent: "Email enviado",
 };
 const ACTOR_LABELS: Record<string, string> = { patient: "el paciente", admin: "el equipo", system: "el sistema", ai: "el asistente" };

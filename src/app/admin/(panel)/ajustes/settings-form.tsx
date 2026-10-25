@@ -25,7 +25,7 @@ export function SettingsForm({ action, initial, readOnly }: { action: (s: FormSt
       <Section title="Reservas y cancelaciones" description="Se aplican en el servidor a la reserva online, por chat y por formulario.">
         <div className="grid gap-5 sm:grid-cols-2">
           <TextField name="cancelMinHours" label="Horas mínimas para cancelar" {...num} min={0} max={720} defaultValue={initial.cancelMinHours} hint="El paciente puede cancelar online hasta esta cantidad de horas antes del turno." />
-          <TextField name="reminderHours" label="Recordatorio (horas antes)" {...num} min={1} max={336} defaultValue={initial.reminderHours} hint="Todavía no se envía: los emails llegan en el próximo hito. Se guarda para entonces." />
+          <TextField name="reminderHours" label="Recordatorio (horas antes)" {...num} min={1} max={336} defaultValue={initial.reminderHours} hint="Cuántas horas antes del turno le llega el recordatorio por email al paciente." />
           <TextField name="slotStepMinutes" label="Grilla de horarios (minutos)" {...num} min={5} max={240} defaultValue={initial.slotStepMinutes} hint="Cada cuánto empieza un turno posible: 15 → 9:00, 9:15, 9:30…" />
           <TextField name="minLeadMinutes" label="Anticipación mínima (minutos)" {...num} min={0} max={10080} defaultValue={initial.minLeadMinutes} hint="No se ofrecen turnos que empiecen antes de este margen." />
           <TextField name="bookingHorizonDays" label="Horizonte de reserva (días)" {...num} min={1} max={365} defaultValue={initial.bookingHorizonDays} hint="Hasta cuántos días adelante se puede reservar." />

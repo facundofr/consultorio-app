@@ -81,6 +81,11 @@ async function main() {
       BETTER_AUTH_SECRET: randomBytes(32).toString("base64"),
       AI_ENABLED: process.env.AI_ENABLED ?? "true",
       LLM_MOCK: "1",
+      // Never send real emails from tests, whatever the local .env says: they stay in the test inbox.
+      SMTP_HOST: "",
+      // Two-factor is exercised explicitly in security.spec.ts.
+      TWO_FACTOR_REQUIRED_ROLES: "",
+      JOBS_ENABLED: "true",
       E2E: "1",
     };
     Object.assign(process.env, env);

@@ -183,3 +183,38 @@ describe("patient cancellation (server clock, inside the transaction)", () => {
     await expect(cancelPublic(db, appointment.code, { token: cancelToken }, "link", new Date(start.getTime() - 48 * H))).resolves.toBeTruthy();
   });
 });
+
+describe("returning patients", () => {
+  it("a public booking cannot replace an existing patient's email", async () => {
+    const victim = await book(ar(MON, "10:00"));
+    // Someone who knows the victim's phone and name books with their own email.
+    await bookPublic(
+      db,
+      { professionalId: f.prof.id, locationId: f.locA.id, serviceId: f.svc.id, startsAt: ar(MON, "11:00"), patient: { ...patient(1), email: "intruso@example.com" }, consent: true },
+      { source: "form", now: NOW },
+    );
+    // The intruder's email does not open the victim's appointment…
+    await expect(findAppointmentPublic(db, victim.appointment.code, { email: "intruso@example.com" }, NOW)).rejects.toMatchObject({ code: "NOT_FOUND" });
+    // …and the victim's own email still does.
+    await expect(findAppointmentPublic(db, victim.appointment.code, { email: patient(1).email }, NOW)).resolves.toBeTruthy();
+  });
+
+  it("both bookings belong to the same patient", async () => {
+    const a = await book(ar(MON, "10:00"));
+    const b = await book(ar(MON, "11:00"));
+    expect(a.appointment.patientId).toBe(b.appointment.patientId);
+  });
+});
+
+describe("deactivated clinic", () => {
+  it("takes no online bookings and shows no slots, but the team can still book", async () => {
+    const { clinics: clinicsTable } = await import("@/db/schema");
+    await db.update(clinicsTable).set({ active: false }).where(eq(clinicsTable.id, f.clinic.id));
+    await expect(book(ar(MON, "10:00"))).rejects.toMatchObject({ code: "NOT_FOUND" });
+    await expect(findSlots(db, { clinicId: f.clinic.id, specialtyId: f.spec.id, serviceId: f.svc.id }, NOW)).rejects.toMatchObject({ code: "NOT_FOUND" });
+    const { createAppointment } = await import("@/server/appointments/create");
+    await expect(
+      createAppointment(db, { professionalId: f.prof.id, locationId: f.locA.id, serviceId: f.svc.id, startsAt: ar(MON, "10:00"), patient: patient(1), consent: false }, { source: "admin", now: NOW }),
+    ).resolves.toBeTruthy();
+  });
+});

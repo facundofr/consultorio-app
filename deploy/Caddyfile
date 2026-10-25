@@ -1,0 +1,31 @@
+# HTTPS in front of the app, with automatic Let's Encrypt certificates.
+# DOMAIN comes from .env.production (for example turnos.miclinica.com.ar);
+# its DNS A/AAAA record must point to this server before the first start.
+{$DOMAIN} {
+	encode zstd gzip
+
+	# The app sets its own security headers (CSP, HSTS…); just hide the server name.
+	header -Server
+
+	# Caddy writes X-Forwarded-For with the visitor's address
+	# (TRUSTED_PROXY_HOPS=1 in docker-compose.prod.yml).
+	reverse_proxy app:3000 {
+		health_uri /healthz
+		health_interval 30s
+	}
+
+	log {
+		output stdout
+		# JSON access log without secrets: appointment links carry a token in ?t=,
+		# and cookies hold the panel session.
+		format filter {
+			wrap json
+			request>uri query {
+				delete t
+			}
+			request>headers>Cookie delete
+			request>headers>Authorization delete
+			resp_headers>Set-Cookie delete
+		}
+	}
+}

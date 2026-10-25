@@ -30,6 +30,13 @@ describe("rbac", () => {
     expect(can(s, "read", "users")).toBe(false);
     expect(can(s, "read", "audit")).toBe(false);
     expect(can(s, "read", "conversations")).toBe(false);
+    expect(can(s, "read", "exports")).toBe(false);
+  });
+
+  it("only administration exports patient data in bulk", () => {
+    expect(can(actor("clinic_admin"), "read", "exports")).toBe(true);
+    expect(can(actor("superadmin"), "read", "exports")).toBe(true);
+    expect(() => assertCan(actor("clinic_admin"), "read", "exports", "c2")).toThrow(/clínica/);
   });
 
   it("clinic access requires matching clinic for non-superadmins", () => {

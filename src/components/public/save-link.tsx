@@ -30,7 +30,7 @@ export function SaveLink({ code, path, summary }: { code: string; path: string; 
     <section aria-labelledby="guardar-titulo" className="mb-6 flex flex-col gap-3 rounded-xl border-2 border-sol bg-sol-claro p-4">
       <h2 id="guardar-titulo" className="text-lg font-bold">Guardá este enlace</h2>
       <p>
-        Con él podés ver tu turno, agregarlo al calendario o cancelarlo. Si lo perdés, buscalo en «Mi turno» con el código{" "}
+        Con él podés ver tu turno, agregarlo al calendario o cancelarlo. También te lo mandamos por email. Si lo perdés, buscalo en «Mi turno» con el código{" "}
         <span className="font-bold tabular-nums">{code}</span> y tu teléfono o email.
       </p>
       <div className="flex flex-wrap gap-3">

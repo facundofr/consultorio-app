@@ -33,7 +33,7 @@ export default async function AppointmentByLinkPage({ params, searchParams }: Pa
 
   let view;
   try {
-    if (!rateLimit(`link:${await clientIpHash()}`, 60, 15 * 60_000).ok) throw new Error("rate");
+    if (!(await rateLimit(`link:${await clientIpHash()}`, 60, 15 * 60_000)).ok) throw new Error("rate");
     view = toClientView(await findAppointmentPublic(getDb(), code, { token }));
   } catch (e) {
     const msg = isDomainError(e) ? "El enlace no es válido o venció. Buscá tu turno con el código y tu teléfono o email." : "Hiciste muchos intentos. Esperá unos minutos.";

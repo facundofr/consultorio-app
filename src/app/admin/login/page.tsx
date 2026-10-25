@@ -1,12 +1,13 @@
 import type { Metadata } from "next";
 import { redirect } from "next/navigation";
-import { getActor } from "@/server/auth/session";
+import { getActor, getPendingTwoFactor } from "@/server/auth/session";
 import { LoginForm } from "./login-form";
 
 export const metadata: Metadata = { title: "Ingresar al panel", robots: { index: false } };
 
 export default async function LoginPage({ searchParams }: PageProps<"/admin/login">) {
   if (await getActor()) redirect("/admin");
+  if (await getPendingTwoFactor()) redirect("/admin/login/verificar");
   const sp = await searchParams;
   const next = typeof sp.next === "string" ? sp.next : undefined;
   return (

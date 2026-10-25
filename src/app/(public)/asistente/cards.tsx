@@ -137,7 +137,7 @@ function BookingCard({ card, session, locked, onBooked }: { card: Extract<ChatCa
         ) : null}
         <Field name="fullName" label="Nombre y apellido" autoComplete="name" defaultValue={v?.fullName} error={state.fieldErrors?.fullName} />
         <Field name="phone" label="Teléfono celular" type="tel" inputMode="tel" autoComplete="tel" defaultValue={v?.phone} hint="Con código de área, por ejemplo 11 5555-1234." error={state.fieldErrors?.phone} />
-        <Field name="email" label="Email" type="email" inputMode="email" autoComplete="email" defaultValue={v?.email} hint="Para identificarte si después querés ver o cancelar el turno." error={state.fieldErrors?.email} />
+        <Field name="email" label="Email" type="email" inputMode="email" autoComplete="email" defaultValue={v?.email} hint="Te mandamos la confirmación y un recordatorio antes del turno." error={state.fieldErrors?.email} />
         <div className="absolute -left-[9999px] h-0 w-0 overflow-hidden" aria-hidden>
           <label>
             No completar

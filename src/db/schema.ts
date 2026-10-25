@@ -443,6 +443,56 @@ export const appointmentEvents = pgTable(
 );
 
 /* ------------------------------------------------------------------ */
+/* Email outbox                                                        */
+/* ------------------------------------------------------------------ */
+
+export const emailKind = pgEnum("email_kind", ["confirmation", "cancellation", "rescheduled", "reminder"]);
+export type EmailKind = (typeof emailKind.enumValues)[number];
+
+/**
+ * pending  → waiting to be sent (or retried after nextAttemptAt)
+ * sending  → claimed by a worker; if it crashes, it is picked up again
+ * sent     → delivered to the SMTP server (payload wiped)
+ * preview  → no SMTP configured: kept for the panel's test inbox
+ * failed   → gave up after several attempts
+ */
+export const emailStatus = pgEnum("email_status", ["pending", "sending", "sent", "preview", "failed"]);
+export type EmailStatus = (typeof emailStatus.enumValues)[number];
+
+/**
+ * Emails are queued in the same transaction as the change that triggers
+ * them and sent by a background job with retries: if the provider fails,
+ * the booking does not. The rendered message (recipient, links with the
+ * cancel token) is stored encrypted and wiped once sent.
+ */
+export const emailOutbox = pgTable(
+  "email_outbox",
+  {
+    id: id(),
+    clinicId: uuid("clinic_id")
+      .notNull()
+      .references(() => clinics.id),
+    appointmentId: uuid("appointment_id").references(() => appointments.id, { onDelete: "set null" }),
+    kind: emailKind("kind").notNull(),
+    status: emailStatus("status").notNull().default("pending"),
+    /** encrypt(JSON {to, subject, html, text}); null once sent. */
+    payloadEnc: text("payload_enc"),
+    /** Subject without personal data, for the panel list. */
+    subjectPreview: text("subject_preview").notNull(),
+    attempts: integer("attempts").notNull().default(0),
+    nextAttemptAt: timestamp("next_attempt_at", { withTimezone: true }).notNull().defaultNow(),
+    lastError: text("last_error"),
+    sentAt: timestamp("sent_at", { withTimezone: true }),
+    createdAt: createdAt(),
+  },
+  (t) => [
+    index("email_outbox_due_idx").on(t.nextAttemptAt).where(sql`status in ('pending', 'sending')`),
+    index("email_outbox_clinic_created_idx").on(t.clinicId, t.createdAt),
+    index("email_outbox_appointment_idx").on(t.appointmentId),
+  ],
+);
+
+/* ------------------------------------------------------------------ */
 /* Knowledge base & assistant                                          */
 /* ------------------------------------------------------------------ */
 
@@ -532,6 +582,14 @@ export const users = pgTable("users", {
   /** Null only for superadmin. */
   clinicId: uuid("clinic_id").references(() => clinics.id),
   active: boolean("active").notNull().default(true),
+  /** TOTP secret (base32), encrypted with PII_ENCRYPTION_KEY. Set during setup, before it is confirmed. */
+  totpSecretEnc: text("totp_secret_enc"),
+  /** Two-factor is on only once the first code was confirmed. */
+  totpEnabledAt: timestamp("totp_enabled_at", { withTimezone: true }),
+  /** Last accepted 30-second step: a code can never be used twice. */
+  totpLastStep: integer("totp_last_step"),
+  /** Keyed hashes of the unused backup codes. */
+  backupCodeHashes: jsonb("backup_code_hashes").$type<string[]>(),
   createdAt: createdAt(),
   updatedAt: updatedAt(),
 });
@@ -547,6 +605,8 @@ export const sessions = pgTable(
     expiresAt: timestamp("expires_at", { withTimezone: true }).notNull(),
     ipAddress: text("ip_address"),
     userAgent: text("user_agent"),
+    /** Set once the second factor was checked for this session (users with 2FA on). */
+    twoFactorVerifiedAt: timestamp("two_factor_verified_at", { withTimezone: true }),
     createdAt: createdAt(),
     updatedAt: updatedAt(),
   },
@@ -597,6 +657,21 @@ export const auditLog = pgTable(
     createdAt: createdAt(),
   },
   (t) => [index("audit_log_created_idx").on(t.createdAt), index("audit_log_clinic_idx").on(t.clinicId)],
+);
+
+/**
+ * Attempt counters for rate limits (login, bookings, lookups, chat), shared
+ * by every app instance and kept across restarts. Fixed window that starts
+ * with the first hit. `key` is a keyed hash: no emails or IPs in clear.
+ */
+export const rateLimits = pgTable(
+  "rate_limits",
+  {
+    key: text("key").primaryKey(),
+    hits: integer("hits").notNull(),
+    windowEndsAt: timestamp("window_ends_at", { withTimezone: true }).notNull(),
+  },
+  (t) => [index("rate_limits_window_ends_idx").on(t.windowEndsAt)],
 );
 
 /** Simple key/value store for job bookkeeping (last run, etc.). */

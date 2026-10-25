@@ -14,6 +14,7 @@ import { listAppointments, SOURCE_LABELS, STATUS_LABELS } from "@/server/admin/a
 import { listLocations } from "@/server/admin/catalog";
 import { PAGE_SIZE } from "@/server/admin/common";
 import { listProfessionals } from "@/server/admin/professionals";
+import { can } from "@/server/auth/rbac";
 import { getClinicContext } from "@/server/clinics/settings";
 import { adminContext, param } from "../../_lib/context";
 
@@ -47,11 +48,13 @@ export default async function AppointmentsPage({ searchParams }: PageProps<"/adm
       <PageHeader
         title="Turnos"
         actions={
-          <Button asChild variant="outline">
-            <a href={`/admin/exportar-turnos?${exportQs}`} download>
-              <Download /> Exportar CSV
-            </a>
-          </Button>
+          can(actor, "read", "exports") ? (
+            <Button asChild variant="outline">
+              <a href={`/admin/exportar-turnos?${exportQs}`} download>
+                <Download /> Exportar CSV
+              </a>
+            </Button>
+          ) : undefined
         }
       />
       <form method="get" className="mb-4 grid gap-3 sm:grid-cols-2 lg:grid-cols-4 xl:grid-cols-8 xl:items-end">

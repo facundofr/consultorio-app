@@ -4,6 +4,7 @@ import { and, eq, isNull } from "drizzle-orm";
 import { appointmentEvents, appointments, patients, type AppointmentSource } from "@/db/schema";
 import { generateAppointmentCode, generateCancelToken, hashToken } from "@/lib/codes";
 import { getAvailableSlots, loadBookingContext } from "@/server/availability/service";
+import { enqueueAppointmentEmail } from "@/server/email/outbox";
 import {
   DomainError,
   PG_DEADLOCK,
@@ -77,6 +78,8 @@ export async function createAppointment(
       const appointment = await db.transaction(async (tx) => {
         await lockProfessionalAgenda(tx, input.professionalId);
         const bc = await loadBookingContext(tx, input);
+        // A deactivated clinic takes no online bookings (the team can still book).
+        if (isPatientFacing && !bc.clinic.active) throw new DomainError("NOT_FOUND", "No encontramos esa clínica.");
         const endsAt = new Date(input.startsAt.getTime() + bc.service.durationMinutes * 60_000);
 
         if (!opts.allowOutsideGrid) {
@@ -112,7 +115,9 @@ export async function createAppointment(
           if (!p) throw new DomainError("NOT_FOUND", "No encontramos ese paciente.");
           patientId = p.id;
         } else {
-          patientId = (await upsertPatient(tx, bc.clinic.id, input.patient!, input.consent ? now : null)).id;
+          patientId = (
+            await upsertPatient(tx, bc.clinic.id, input.patient!, input.consent ? now : null, { refreshContact: !isPatientFacing })
+          ).id;
         }
 
         const [row] = await tx
@@ -143,6 +148,8 @@ export async function createAppointment(
           actorUserId: opts.actorUserId ?? null,
           data: { source: opts.source, startsAt: row.startsAt.toISOString() },
         });
+        // Same transaction: the email exists if and only if the booking does.
+        await enqueueAppointmentEmail(tx, row.id, "confirmation", { cancelToken, now });
         return row;
       });
       return { appointment, cancelToken };

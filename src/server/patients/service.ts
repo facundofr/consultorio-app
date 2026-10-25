@@ -31,13 +31,18 @@ export type PatientRow = typeof patients.$inferSelect;
 /**
  * Find the patient by (clinic, phone, normalized name) or create it.
  * Different people sharing a phone (family) end up as different patients.
- * The email and display name are refreshed on every booking.
+ *
+ * `refreshContact` (staff only) overwrites the stored email with the one
+ * typed now. Public bookings never do: knowing someone's phone and name is
+ * not proof of identity, and the email is a second factor to view or cancel
+ * appointments. A public booking for an existing patient keeps their email.
  */
 export async function upsertPatient(
   db: DbOrTx,
   clinicId: string,
   input: PatientInput,
   consentAt: Date | null,
+  opts: { refreshContact?: boolean } = {},
 ): Promise<PatientRow> {
   const p = PatientInput.parse(input);
   const phone = normalizePhone(p.phone);
@@ -59,9 +64,7 @@ export async function upsertPatient(
     .onConflictDoUpdate({
       target: [patients.clinicId, patients.phoneHash, patients.nameKey],
       set: {
-        fullName: values.fullName,
-        emailEnc: values.emailEnc,
-        emailHash: values.emailHash,
+        ...(opts.refreshContact ? { fullName: values.fullName, emailEnc: values.emailEnc, emailHash: values.emailHash } : {}),
         deletedAt: null,
         ...(consentAt ? { consentAt, consentVersion: CONSENT_VERSION } : {}),
       },

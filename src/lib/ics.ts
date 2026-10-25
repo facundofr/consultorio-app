@@ -12,6 +12,8 @@ export type IcsEvent = {
   url?: string;
   stamp?: Date;
   cancelled?: boolean;
+  /** Must grow with every change so calendars replace the old version. Default: DTSTAMP in seconds. */
+  sequence?: number;
 };
 
 function utc(d: Date): string {
@@ -20,7 +22,7 @@ function utc(d: Date): string {
 
 /** Escape text values (RFC 5545 §3.3.11). */
 export function escapeText(s: string): string {
-  return s.replace(/\\/g, "\\\\").replace(/;/g, "\;").replace(/,/g, "\\,").replace(/\r?\n/g, "\\n");
+  return s.replace(/\\/g, "\\\\").replace(/;/g, "\\;").replace(/,/g, "\\,").replace(/\r?\n/g, "\\n");
 }
 
 /** Fold lines longer than 75 octets (RFC 5545 §3.1), without splitting UTF-8 sequences. */
@@ -56,6 +58,7 @@ export function buildIcs(ev: IcsEvent): string {
     "BEGIN:VEVENT",
     `UID:${ev.uid}`,
     `DTSTAMP:${utc(ev.stamp ?? new Date())}`,
+    `SEQUENCE:${ev.sequence ?? Math.floor((ev.stamp ?? new Date()).getTime() / 1000)}`,
     `DTSTART:${utc(ev.start)}`,
     `DTEND:${utc(ev.end)}`,
     `SUMMARY:${escapeText(ev.summary)}`,

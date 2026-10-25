@@ -1,9 +1,9 @@
 import { randomUUID } from "node:crypto";
-import { and, asc, eq, ilike, or, type SQL } from "drizzle-orm";
+import { and, asc, eq, ilike, ne, or, type SQL } from "drizzle-orm";
 import { z } from "zod";
 import type { Db } from "@/db/client";
 import { accounts, clinics, sessions, users, userRole } from "@/db/schema";
-import { hashPassword, PASSWORD_MIN_LENGTH } from "@/server/auth/password";
+import { hashPassword, PASSWORD_MIN_LENGTH, verifyPassword } from "@/server/auth/password";
 import { assertCan, assignableRoles, type Actor } from "@/server/auth/rbac";
 import { DomainError, PG_UNIQUE_VIOLATION, pgErrorCode } from "@/server/errors";
 import { audit } from "./audit";
@@ -33,7 +33,9 @@ export const UserInput = z.object({
 });
 export type UserInput = z.input<typeof UserInput>;
 
-export type UserListItem = Omit<typeof users.$inferSelect, "image" | "emailVerified"> & { clinicName: string | null };
+/** Never includes the two-factor secret or backup code hashes. */
+type UserSecrets = "image" | "emailVerified" | "totpSecretEnc" | "totpEnabledAt" | "totpLastStep" | "backupCodeHashes";
+export type UserListItem = Omit<typeof users.$inferSelect, UserSecrets> & { clinicName: string | null };
 
 function scopeCheck(actor: Actor, target: { role: string; clinicId: string | null }) {
   if (actor.role === "superadmin") return;
@@ -60,7 +62,13 @@ export async function listUsers(db: Db, actor: Actor, opts: { q?: string } = {})
 
 export async function getUser(db: Db, actor: Actor, id: string) {
   assertCan(actor, "read", "users");
-  const [u] = await db.select().from(users).where(eq(users.id, id));
+  const [u] = await db
+    .select({
+      id: users.id, name: users.name, email: users.email, role: users.role, clinicId: users.clinicId,
+      active: users.active, createdAt: users.createdAt, updatedAt: users.updatedAt, totpEnabledAt: users.totpEnabledAt,
+    })
+    .from(users)
+    .where(eq(users.id, id));
   if (!u) throw new DomainError("NOT_FOUND", "No encontramos ese usuario.");
   scopeCheck(actor, u);
   return u;
@@ -104,4 +112,25 @@ export async function saveUser(db: Db, actor: Actor, raw: UserInput, id?: string
     if (pgErrorCode(e) === PG_UNIQUE_VIOLATION) throw new DomainError("VALIDATION", "Ya existe un usuario con ese email.");
     throw e;
   }
+}
+
+/**
+ * Change your own password: needs the current one. Every other session of
+ * the user is closed (this one stays open).
+ */
+export async function changeOwnPassword(db: Db, actor: Actor, raw: { current: string; next: string; confirm: string }) {
+  const input = z
+    .object({ current: z.string().min(1, "Ingresá tu contraseña actual.").max(200), next: password, confirm: z.string() })
+    .refine((v) => v.next === v.confirm, { message: "Las contraseñas nuevas no coinciden.", path: ["confirm"] })
+    .refine((v) => v.next !== v.current, { message: "La nueva tiene que ser distinta de la actual.", path: ["next"] })
+    .parse(raw);
+  const [acc] = await db.select().from(accounts).where(and(eq(accounts.userId, actor.id), eq(accounts.providerId, "credential")));
+  if (!acc?.password || !(await verifyPassword(acc.password, input.current))) {
+    throw new DomainError("VALIDATION", "La contraseña actual no es correcta.");
+  }
+  await db.transaction(async (tx) => {
+    await tx.update(accounts).set({ password: await hashPassword(input.next) }).where(eq(accounts.id, acc.id));
+    await tx.delete(sessions).where(actor.sessionId ? and(eq(sessions.userId, actor.id), ne(sessions.id, actor.sessionId)) : eq(sessions.userId, actor.id));
+    await audit(tx, actor, { action: "password.changed", entity: "user", entityId: actor.id, clinicId: actor.clinicId });
+  });
 }

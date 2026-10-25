@@ -11,7 +11,9 @@ import {
   House,
   ListChecks,
   LogOut,
+  Mail,
   MapPin,
+  ShieldCheck,
   MessagesSquare,
   Settings,
   Stethoscope,
@@ -44,6 +46,8 @@ const ICONS = {
   usercog: UserCog,
   history: History,
   chat: MessagesSquare,
+  mail: Mail,
+  shield: ShieldCheck,
 } as const;
 
 export type NavItem = { href: string; label: string; icon: keyof typeof ICONS };

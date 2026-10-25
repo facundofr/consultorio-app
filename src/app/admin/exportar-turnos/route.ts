@@ -1,6 +1,7 @@
 import { getDb } from "@/db/client";
 import { exportAppointmentsCsv } from "@/server/admin/appointments";
 import { getActiveClinicId, getActor } from "@/server/auth/session";
+import { twoFactorRequired } from "@/server/auth/two-factor";
 import { isDomainError } from "@/server/errors";
 
 export const dynamic = "force-dynamic";
@@ -9,6 +10,7 @@ export const dynamic = "force-dynamic";
 export async function GET(req: Request) {
   const actor = await getActor();
   if (!actor) return new Response("No autorizado", { status: 401 });
+  if (twoFactorRequired(actor.role) && !actor.twoFactorEnabled) return new Response("Configurá el doble factor para exportar", { status: 403 });
   const clinicId = await getActiveClinicId(actor);
   if (!clinicId) return new Response("Sin clínica", { status: 400 });
   const sp = new URL(req.url).searchParams;

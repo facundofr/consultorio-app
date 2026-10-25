@@ -1,8 +1,11 @@
 import type { Metadata } from "next";
+import { assistantConfig } from "@/server/assistant/config";
 
 export const metadata: Metadata = { title: "Privacidad y datos personales" };
 
 export default function PrivacyPage() {
+  // Same value the cleanup job uses, so this text can never drift from it.
+  const days = assistantConfig().retentionDays;
   return (
     <article className="flex max-w-prose flex-col gap-5 leading-relaxed">
       <h1 className="text-3xl font-bold tracking-tight">Privacidad y datos personales</h1>
@@ -17,7 +20,7 @@ export default function PrivacyPage() {
       <p>No los usamos para publicidad ni los compartimos con terceros fuera de la clínica que elegiste.</p>
       <h2 className="text-xl font-semibold">Cómo los protegemos</h2>
       <p>
-        Tu teléfono y tu email se guardan cifrados. Las conversaciones con el asistente se guardan solo para controlar la calidad del servicio y se borran automáticamente a los 30 días. El acceso del equipo de la clínica queda registrado.
+        Tu teléfono y tu email se guardan cifrados. Las conversaciones con el asistente se guardan solo para controlar la calidad del servicio y se borran automáticamente a los {days} días. Los emails que te enviamos se borran de nuestros servidores apenas salen. El acceso del equipo de la clínica queda registrado.
       </p>
       <h2 className="text-xl font-semibold">El asistente de IA</h2>
       <p>
